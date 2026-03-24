@@ -8,12 +8,12 @@ export default function TopBar() {
 
   // Compute aggregate flow from all master_flow sensors
   const totalFlow = sensors
-    .filter((s) => s.data.type === 'master_flow')
-    .reduce((sum, s) => sum + (s.data as { type: 'master_flow'; value: number }).value, 0);
+    .filter((s) => s.type === 'master_flow')
+    .reduce((sum, s) => sum + 0, 0); // TODO: Add physical readings to store later
 
   // Determine system status — green if no water_drop sensors are wet
   const hasLeak = sensors.some(
-    (s) => s.data.type === 'water_drop' && (s.data as { type: 'water_drop'; isWet: boolean }).isWet,
+    (s) => s.type === 'water_drop' && false, // TODO: Add physical readings to store later
   );
   const systemStatus = hasLeak ? 'ALERT' : 'OK';
   const statusColor = hasLeak ? 'text-red-600 bg-red-50 border-red-200' : 'text-emerald-700 bg-emerald-50 border-emerald-200';

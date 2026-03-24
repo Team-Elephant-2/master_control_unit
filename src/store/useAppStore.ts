@@ -17,7 +17,7 @@ export type SensorData =
 
 // ── Canvas Mode ─────────────────────────────────────────────────────
 
-export type CanvasMode = 'select' | 'add_room' | 'draw_pipe';
+export type CanvasMode = 'select' | 'add_room' | 'draw_pipe' | 'add_sensor';
 
 // ── Entity Types ────────────────────────────────────────────────────
 
@@ -39,12 +39,16 @@ export interface Pipe {
   points: number[]; // flat [x1,y1,x2,y2,...] polyline
 }
 
+export type SensorType = 'master_flow' | 'humidity' | 'water_drop' | 'pump' | 'valve';
+
 export interface Sensor {
   id: string;
+  hardwareId: number;
+  type: SensorType;
   floorId: string;
+  roomId: string | null;
   x: number;
   y: number;
-  data: SensorData;
 }
 
 // ── Store Shape ─────────────────────────────────────────────────────
@@ -61,6 +65,7 @@ interface AppState {
   canvasMode: CanvasMode;
   selectedId: string | null;
   drawingPipePoints: number[];
+  selectedSensorType: SensorType;
 
   // Floor actions
   addFloor: (name: string) => void;
@@ -71,6 +76,7 @@ interface AppState {
   setCanvasMode: (mode: CanvasMode) => void;
   setSelectedId: (id: string | null) => void;
   deleteEntity: (id: string) => void;
+  setSelectedSensorType: (type: SensorType) => void;
 
   // Room actions
   addRoom: (floorId: string, x: number, y: number) => void;
@@ -82,6 +88,11 @@ interface AppState {
   updatePipePoints: (pipeId: string, points: number[]) => void;
   setDrawingPipePoints: (points: number[]) => void;
   clearDrawingPipe: () => void;
+
+  // Sensor actions
+  addSensor: (sensor: Omit<Sensor, 'id'>) => void;
+  updateSensorPosition: (id: string, x: number, y: number, roomId: string | null) => void;
+  updateSensorHardwareId: (id: string, hardwareId: number) => void;
 }
 
 // ── Helpers ─────────────────────────────────────────────────────────
@@ -116,6 +127,7 @@ export const useAppStore = create<AppState>((set) => ({
   canvasMode: 'select',
   selectedId: null,
   drawingPipePoints: [],
+  selectedSensorType: 'master_flow',
 
   // ── Floor actions ───────────────────────────────────────────────
 
@@ -156,8 +168,11 @@ export const useAppStore = create<AppState>((set) => ({
     set((state) => ({
       rooms: state.rooms.filter((r) => r.id !== id),
       pipes: state.pipes.filter((p) => p.id !== id),
+      sensors: state.sensors.filter((s) => s.id !== id),
       selectedId: state.selectedId === id ? null : state.selectedId,
     })),
+
+  setSelectedSensorType: (type: SensorType) => set({ selectedSensorType: type }),
 
   // ── Room actions ────────────────────────────────────────────────
 
@@ -210,4 +225,32 @@ export const useAppStore = create<AppState>((set) => ({
     set({ drawingPipePoints: points }),
 
   clearDrawingPipe: () => set({ drawingPipePoints: [] }),
+
+  // ── Sensor actions ────────────────────────────────────────────────
+
+  addSensor: (sensorArgs: Omit<Sensor, 'id'>) => {
+    const newSensor: Sensor = {
+      id: generateId('sensor'),
+      ...sensorArgs,
+    };
+    set((state) => ({
+      sensors: [...state.sensors, newSensor],
+      canvasMode: 'select' as CanvasMode,
+      selectedId: newSensor.id,
+    }));
+  },
+
+  updateSensorPosition: (id: string, x: number, y: number, roomId: string | null) =>
+    set((state) => ({
+      sensors: state.sensors.map((s) =>
+        s.id === id ? { ...s, x, y, roomId } : s
+      ),
+    })),
+
+  updateSensorHardwareId: (id: string, hardwareId: number) =>
+    set((state) => ({
+      sensors: state.sensors.map((s) =>
+        s.id === id ? { ...s, hardwareId } : s
+      ),
+    })),
 }));

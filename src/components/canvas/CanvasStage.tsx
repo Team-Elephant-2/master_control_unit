@@ -1,12 +1,12 @@
-'use client';
-
 import React, { useRef, useState, useEffect, useCallback } from 'react';
 import { Stage, Layer, Circle } from 'react-konva';
 import { useAppStore } from '@/store/useAppStore';
 import RoomShape from './RoomShape';
 import PipeShape from './PipeShape';
 import DrawingPipe from './DrawingPipe';
+import SensorShape from './SensorShape';
 import type { KonvaEventObject } from 'konva/lib/Node';
+import { getClosestPointOnPipes, findRoomForPoint } from '@/utils/geometry';
 
 // ── Grid dot rendering ──────────────────────────────────────────────
 
@@ -48,6 +48,7 @@ export default function CanvasStage() {
   const activeFloorId = useAppStore((s) => s.activeFloorId);
   const rooms = useAppStore((s) => s.rooms);
   const pipes = useAppStore((s) => s.pipes);
+  const sensors = useAppStore((s) => s.sensors);
   const drawingPipePoints = useAppStore((s) => s.drawingPipePoints);
   const selectedId = useAppStore((s) => s.selectedId);
 
@@ -60,6 +61,7 @@ export default function CanvasStage() {
   // Filter entities for active floor
   const floorRooms = rooms.filter((r) => r.floorId === activeFloorId);
   const floorPipes = pipes.filter((p) => p.floorId === activeFloorId);
+  const floorSensors = sensors.filter((s) => s.floorId === activeFloorId);
 
   // ── Resize observer ─────────────────────────────────────────────
 
@@ -121,6 +123,31 @@ export default function CanvasStage() {
         case 'draw_pipe':
           setDrawingPipePoints([...drawingPipePoints, pos.x, pos.y]);
           break;
+          
+        case 'add_sensor': {
+          const selectedType = useAppStore.getState().selectedSensorType;
+          const closest = getClosestPointOnPipes(pos.x, pos.y, floorPipes);
+          
+          if (!closest || closest.dist > 30) {
+            console.warn('Place sensor on a pipe.');
+            return;
+          }
+          
+          // Use a default hardware ID since window.prompt is blocked in some environments (like VSCode webviews)
+          // The user can edit this in the RightSidebar.
+          const defaultHardwareId = Math.floor(Math.random() * 1000) + 1;
+          const roomId = findRoomForPoint(closest.x, closest.y, floorRooms);
+
+          useAppStore.getState().addSensor({
+            hardwareId: defaultHardwareId,
+            type: selectedType,
+            floorId: activeFloorId,
+            roomId,
+            x: closest.x,
+            y: closest.y
+          });
+          break;
+        }
 
         case 'select':
           // Only deselect if clicking on the stage background (not a shape)
@@ -130,7 +157,7 @@ export default function CanvasStage() {
           break;
       }
     },
-    [canvasMode, activeFloorId, drawingPipePoints, addRoom, setDrawingPipePoints, setSelectedId],
+    [canvasMode, activeFloorId, drawingPipePoints, floorPipes, floorRooms, addRoom, setDrawingPipePoints, setSelectedId],
   );
 
   // ── Double-click to finalize pipe ───────────────────────────────
@@ -155,11 +182,9 @@ export default function CanvasStage() {
   // ── Cursor style ────────────────────────────────────────────────
 
   const cursorClass =
-    canvasMode === 'add_room'
+    canvasMode === 'add_room' || canvasMode === 'draw_pipe' || canvasMode === 'add_sensor'
       ? 'cursor-crosshair'
-      : canvasMode === 'draw_pipe'
-        ? 'cursor-crosshair'
-        : 'cursor-default';
+      : 'cursor-default';
 
   return (
     <div
@@ -195,6 +220,11 @@ export default function CanvasStage() {
           {drawingPipePoints.length > 0 && (
             <DrawingPipe points={drawingPipePoints} />
           )}
+
+          {/* Sensors (Highest layer) */}
+          {floorSensors.map((sensor) => (
+            <SensorShape key={sensor.id} sensor={sensor} />
+          ))}
         </Layer>
       </Stage>
     </div>

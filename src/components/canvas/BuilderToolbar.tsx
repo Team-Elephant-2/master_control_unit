@@ -1,12 +1,13 @@
 'use client';
 
-import { MousePointer2, Square, PenTool } from 'lucide-react';
+import { MousePointer2, Square, PenTool, Cpu } from 'lucide-react';
 import { useAppStore, type CanvasMode } from '@/store/useAppStore';
 
 const MODES: { mode: CanvasMode; label: string; Icon: typeof MousePointer2 }[] = [
   { mode: 'select', label: 'Select', Icon: MousePointer2 },
   { mode: 'add_room', label: 'Add Room', Icon: Square },
   { mode: 'draw_pipe', label: 'Draw Pipe', Icon: PenTool },
+  { mode: 'add_sensor', label: 'Add Sensor', Icon: Cpu },
 ];
 
 export default function BuilderToolbar() {
