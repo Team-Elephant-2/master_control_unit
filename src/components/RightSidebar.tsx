@@ -1,15 +1,15 @@
 'use client';
 
 import React from 'react';
-import { Info, Map as MapIcon, Edit2, Droplet, Droplets, Thermometer, Power, Activity, Cpu } from 'lucide-react';
+import { Info, Map as MapIcon, Edit2, Droplet, Droplets, CloudRain, Zap, Waves, DoorClosed, Cpu } from 'lucide-react';
 import { useAppStore, type SensorType } from '@/store/useAppStore';
 
 const SENSOR_TYPES: { type: SensorType; label: string; Icon: React.ElementType }[] = [
-  { type: 'master_flow', label: 'Waterflow', Icon: Activity },
-  { type: 'humidity', label: 'Humidity', Icon: Thermometer },
+  { type: 'master_flow', label: 'Waterflow', Icon: Waves },
+  { type: 'humidity', label: 'Humidity', Icon: CloudRain },
   { type: 'water_drop', label: 'Water Drop', Icon: Droplets },
-  { type: 'pump', label: 'Pump', Icon: Power },
-  { type: 'valve', label: 'Valve', Icon: Droplet },
+  { type: 'pump', label: 'Pump', Icon: Zap },
+  { type: 'valve', label: 'Valve', Icon: DoorClosed },
 ];
 
 export default function RightSidebar() {
