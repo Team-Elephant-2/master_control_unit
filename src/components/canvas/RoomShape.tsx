@@ -1,4 +1,4 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useMemo } from 'react';
 import { Line, Circle, Text, Group, Transformer } from 'react-konva';
 import { useAppStore } from '@/store/useAppStore';
 import type { Room } from '@/store/useAppStore';
@@ -18,6 +18,7 @@ export default function RoomShape({ room }: RoomShapeProps) {
   const selectedId = useAppStore((s) => s.selectedId);
   const setSelectedId = useAppStore((s) => s.setSelectedId);
   const updateRoomPoints = useAppStore((s) => s.updateRoomPoints);
+  const renameRoom = useAppStore((s) => s.renameRoom);
   const allRooms = useAppStore((s) => s.rooms);
 
   const isSelected = selectedId === room.id;
@@ -28,26 +29,48 @@ export default function RoomShape({ room }: RoomShapeProps) {
   useEffect(() => {
     if (isSelected && trRef.current && lineRef.current) {
       trRef.current.nodes([lineRef.current]);
-      trRef.current.getLayer().batchDraw();
+      trRef.current.getLayer()?.batchDraw();
     }
   }, [isSelected]);
 
-  // We snap only to other rooms on the same floor
-  const otherRooms = allRooms.filter(
-    (r) => r.id !== room.id && r.floorId === room.floorId
+  // ── Helpers ──────────────────────────────────────────────────────
+
+  const otherRooms = useMemo(() => 
+    allRooms.filter((r) => r.id !== room.id && r.floorId === room.floorId),
+    [allRooms, room.id, room.floorId]
   );
 
-  // Convert flat array to pairs for anchor rendering
-  const anchorPairs: [number, number][] = [];
-  for (let i = 0; i < pts.length; i += 2) {
-    anchorPairs.push([pts[i], pts[i + 1]]);
-  }
+  const anchorPairs: [number, number][] = useMemo(() => {
+    const pairs: [number, number][] = [];
+    for (let i = 0; i < pts.length; i += 2) {
+      pairs.push([pts[i], pts[i + 1]]);
+    }
+    return pairs;
+  }, [pts]);
 
-  // Compute centroid for the label
   const cx = anchorPairs.reduce((s, p) => s + p[0], 0) / Math.max(1, anchorPairs.length);
   const cy = anchorPairs.reduce((s, p) => s + p[1], 0) / Math.max(1, anchorPairs.length);
 
+  // Bounding box for snapping
+  const bounds = useMemo(() => {
+    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+    for (let i = 0; i < pts.length; i += 2) {
+      minX = Math.min(minX, pts[i]);
+      maxX = Math.max(maxX, pts[i]);
+      minY = Math.min(minY, pts[i + 1]);
+      maxY = Math.max(maxY, pts[i + 1]);
+    }
+    return { minX, maxX, minY, maxY };
+  }, [pts]);
+
   // ── Handlers ──────────────────────────────────────────────────────
+
+  const handleRename = () => {
+    const newName = window.prompt('Enter room name:', room.name);
+    if (newName && newName.trim()) {
+      renameRoom(room.id, newName.trim());
+    }
+  };
 
   const handleClick = (e: KonvaEventObject<MouseEvent>) => {
     if (canvasMode !== 'select') return;
@@ -56,7 +79,7 @@ export default function RoomShape({ room }: RoomShapeProps) {
   };
 
   const handleLineDblClick = (e: KonvaEventObject<MouseEvent>) => {
-    if (canvasMode !== 'select' || !isSelected) return;
+    if (canvasMode !== 'select') return;
     e.cancelBubble = true;
 
     const stage = e.target.getStage();
@@ -64,32 +87,36 @@ export default function RoomShape({ room }: RoomShapeProps) {
     const pos = stage.getPointerPosition();
     if (!pos) return;
 
+    // Determine if we're near the border
     let minLineDist = Infinity;
     let bestInsertIndex = -1;
 
     for (let i = 0; i < anchorPairs.length; i++) {
       const p1 = anchorPairs[i];
       const p2 = anchorPairs[(i + 1) % anchorPairs.length];
-
       const l2 = Math.pow(p1[0] - p2[0], 2) + Math.pow(p1[1] - p2[1], 2);
       if (l2 === 0) continue;
-
       let t = ((pos.x - p1[0]) * (p2[0] - p1[0]) + (pos.y - p1[1]) * (p2[1] - p1[1])) / l2;
       t = Math.max(0, Math.min(1, t));
       const projX = p1[0] + t * (p2[0] - p1[0]);
       const projY = p1[1] + t * (p2[1] - p1[1]);
       const dist = Math.hypot(pos.x - projX, pos.y - projY);
-
       if (dist < minLineDist) {
         minLineDist = dist;
         bestInsertIndex = i + 1;
       }
     }
 
-    if (bestInsertIndex !== -1 && minLineDist < 15) {
-      const newPts = [...pts];
-      newPts.splice(bestInsertIndex * 2, 0, pos.x, pos.y);
-      updateRoomPoints(room.id, newPts);
+    if (minLineDist < 20) {
+      // Logic for adding point
+      if (isSelected && bestInsertIndex !== -1) {
+        const newPts = [...pts];
+        newPts.splice(bestInsertIndex * 2, 0, pos.x, pos.y);
+        updateRoomPoints(room.id, newPts);
+      }
+    } else {
+      // Far from border -> rename
+      handleRename();
     }
   };
 
@@ -98,74 +125,78 @@ export default function RoomShape({ room }: RoomShapeProps) {
   const bakeTransform = (node: any) => {
     const stage = node.getStage();
     if (!stage) return;
-
     const absTransform = node.getAbsoluteTransform();
     const stageAbsInverted = stage.getAbsoluteTransform().copy().invert();
-    
     const newPoints: number[] = [];
     for (let i = 0; i < pts.length; i += 2) {
-      // Get absolute pos, then convert back to stage coordinates
       const absPos = absTransform.point({ x: pts[i], y: pts[i + 1] });
       const stagePos = stageAbsInverted.point(absPos);
       newPoints.push(stagePos.x, stagePos.y);
     }
-
-    // Reset node
-    node.setAttrs({
-      x: 0,
-      y: 0,
-      scaleX: 1,
-      scaleY: 1,
-      rotation: 0,
-    });
+    node.setAttrs({ x: 0, y: 0, scaleX: 1, scaleY: 1, rotation: 0 });
     updateRoomPoints(room.id, newPoints);
   };
 
-  const handleGroupDragEnd = (e: KonvaEventObject<DragEvent>) => {
-    if (e.target.name() !== 'room-group') return;
-    bakeTransform(e.target);
-  };
+  const groupDragBoundFunc = (pos: { x: number; y: number }) => {
+    let bestX = pos.x;
+    let bestY = pos.y;
+    let minDiffX = SNAP_DIST;
+    let minDiffY = SNAP_DIST;
 
-  const handleTransformEnd = (e: KonvaEventObject<Event>) => {
-    bakeTransform(e.target);
-  };
-
-  const anchorDragBoundFunc = (pos: { x: number; y: number }) => {
-    let snapX = pos.x;
-    let snapY = pos.y;
-    let minD = SNAP_DIST;
+    const myEdgesX = [bounds.minX + pos.x, bounds.maxX + pos.x];
+    const myEdgesY = [bounds.minY + pos.y, bounds.maxY + pos.y];
 
     for (const r of otherRooms) {
-      const rpts = r.polygonPoints;
-      for (let j = 0; j < rpts.length; j += 2) {
-        const rx = rpts[j];
-        const ry = rpts[j + 1];
-        const dist = Math.hypot(rx - pos.x, ry - pos.y);
-        if (dist < minD) {
-          minD = dist;
-          snapX = rx;
-          snapY = ry;
+      // Calculate other room's bounds
+      let ominX = Infinity, omaxX = -Infinity, ominY = Infinity, omaxY = -Infinity;
+      for (let j = 0; j < r.polygonPoints.length; j += 2) {
+        ominX = Math.min(ominX, r.polygonPoints[j]);
+        omaxX = Math.max(omaxX, r.polygonPoints[j]);
+        ominY = Math.min(ominY, r.polygonPoints[j + 1]);
+        omaxY = Math.max(omaxY, r.polygonPoints[j + 1]);
+      }
+
+      const oEdgesX = [ominX, omaxX];
+      const oEdgesY = [ominY, omaxY];
+
+      // Check X snaps (move horizontal)
+      for (const myX of myEdgesX) {
+        for (const oX of oEdgesX) {
+          const diff = Math.abs(myX - oX);
+          if (diff < minDiffX) {
+            minDiffX = diff;
+            bestX = pos.x + (oX - myX);
+          }
+        }
+      }
+
+      // Check Y snaps (move vertical)
+      for (const myY of myEdgesY) {
+        for (const oY of oEdgesY) {
+          const diff = Math.abs(myY - oY);
+          if (diff < minDiffY) {
+            minDiffY = diff;
+            bestY = pos.y + (oY - myY);
+          }
         }
       }
     }
-    return { x: snapX, y: snapY };
-  };
 
-  const handleAnchorDrag = (index: number, e: KonvaEventObject<DragEvent>) => {
-    e.cancelBubble = true;
-    const newPoints = [...pts];
-    newPoints[index * 2] = e.target.x();
-    newPoints[index * 2 + 1] = e.target.y();
-    updateRoomPoints(room.id, newPoints);
+    return { x: bestX, y: bestY };
   };
 
   return (
     <Group
       name="room-group"
-      draggable={isSelected && canvasMode === 'select'}
-      onDragEnd={handleGroupDragEnd}
+      draggable={canvasMode === 'select'}
+      dragBoundFunc={groupDragBoundFunc}
+      onDragEnd={(e) => {
+        if (e.target.name() === 'room-group') bakeTransform(e.target);
+      }}
       onClick={handleClick}
       onTap={handleClick as any}
+      onDblClick={handleLineDblClick}
+      onDblTap={handleLineDblClick as any}
     >
       <Line
         ref={lineRef}
@@ -174,13 +205,13 @@ export default function RoomShape({ room }: RoomShapeProps) {
         fill={isSelected ? '#e0f2fe' : '#f0f9ff'}
         stroke={isSelected ? '#38bdf8' : '#cbd5e1'}
         strokeWidth={isSelected ? 2 : 1.5}
-        hitStrokeWidth={15}
-        onDblClick={handleLineDblClick}
-        onDblTap={handleLineDblClick as any}
-        onTransformEnd={handleTransformEnd}
+        hitStrokeWidth={25}
+        onTransformEnd={(e) => bakeTransform(e.target)}
         onMouseEnter={(e) => {
           const container = e.target.getStage()?.container();
-          if (container && isSelected) container.style.cursor = 'move';
+          if (container && canvasMode === 'select') {
+            container.style.cursor = isSelected ? 'move' : 'pointer';
+          }
         }}
         onMouseLeave={(e) => {
           const container = e.target.getStage()?.container();
@@ -189,9 +220,9 @@ export default function RoomShape({ room }: RoomShapeProps) {
       />
 
       <Text
-        x={cx - 30}
+        x={cx - 50}
         y={cy - 6}
-        width={60}
+        width={100}
         align="center"
         text={room.name}
         fontSize={11}
@@ -200,50 +231,46 @@ export default function RoomShape({ room }: RoomShapeProps) {
         listening={false}
       />
 
-      {isSelected &&
-        anchorPairs.map(([ax, ay], i) => (
-          <Circle
-            key={i}
-            name="anchor"
-            x={ax}
-            y={ay}
-            radius={isSelected ? 5 : 4}
-            fill="#ffffff"
-            stroke="#0ea5e9"
-            strokeWidth={2}
-            draggable
-            dragBoundFunc={anchorDragBoundFunc}
-            onDragMove={(e) => handleAnchorDrag(i, e)}
-            onDragEnd={(e) => (e.cancelBubble = true)}
-            onMouseEnter={(e) => {
-              const container = e.target.getStage()?.container();
-              if (container) container.style.cursor = 'grab';
-            }}
-            onMouseLeave={(e) => {
-              const container = e.target.getStage()?.container();
-              if (container) container.style.cursor = 'default';
+      {isSelected && (
+        <>
+          {anchorPairs.map(([ax, ay], i) => (
+            <Circle
+              key={i}
+              x={ax}
+              y={ay}
+              radius={5}
+              fill="#ffffff"
+              stroke="#0ea5e9"
+              strokeWidth={2}
+              draggable
+              onDragMove={(e) => {
+                const newPoints = [...pts];
+                newPoints[i * 2] = e.target.x();
+                newPoints[i * 2 + 1] = e.target.y();
+                updateRoomPoints(room.id, newPoints);
+              }}
+              onDragEnd={(e) => (e.cancelBubble = true)}
+              onMouseEnter={(e) => {
+                 const stage = e.target.getStage();
+                 if (stage) stage.container().style.cursor = 'grab';
+              }}
+              onMouseLeave={(e) => {
+                 const stage = e.target.getStage();
+                 if (stage) stage.container().style.cursor = 'default';
+              }}
+            />
+          ))}
+          <Transformer
+            ref={trRef}
+            rotateEnabled={false}
+            flipEnabled={false}
+            enabledAnchors={['top-center', 'middle-right', 'middle-left', 'bottom-center']}
+            boundBoxFunc={(oldBox, newBox) => {
+              if (Math.abs(newBox.width) < 10 || Math.abs(newBox.height) < 10) return oldBox;
+              return newBox;
             }}
           />
-        ))}
-
-      {isSelected && (
-        <Transformer
-          ref={trRef}
-          rotateEnabled={false}
-          flipEnabled={false}
-          enabledAnchors={[
-            'top-center',
-            'middle-right',
-            'middle-left',
-            'bottom-center',
-          ]}
-          boundBoxFunc={(oldBox, newBox) => {
-            if (Math.abs(newBox.width) < 10 || Math.abs(newBox.height) < 10) {
-              return oldBox;
-            }
-            return newBox;
-          }}
-        />
+        </>
       )}
     </Group>
   );

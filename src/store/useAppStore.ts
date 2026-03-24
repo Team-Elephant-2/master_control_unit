@@ -74,6 +74,7 @@ interface AppState {
 
   // Room actions
   addRoom: (floorId: string, x: number, y: number) => void;
+  renameRoom: (roomId: string, name: string) => void;
   updateRoomPoints: (roomId: string, points: number[]) => void;
 
   // Pipe actions
@@ -164,20 +165,20 @@ export const useAppStore = create<AppState>((set) => ({
     const newRoom: Room = {
       id: generateId('room'),
       floorId,
-      name: `Room ${roomCounter}`,
-      polygonPoints: [
-        x, y,
-        x + ROOM_W, y,
-        x + ROOM_W, y + ROOM_H,
-        x, y + ROOM_H,
-      ],
+      name: `Room ${++roomCounter}`,
+      polygonPoints: [x, y, x + ROOM_W, y, x + ROOM_W, y + ROOM_H, x, y + ROOM_H],
     };
     set((state) => ({
       rooms: [...state.rooms, newRoom],
       canvasMode: 'select' as CanvasMode,
-      selectedRoomId: newRoom.id,
+      selectedId: newRoom.id,
     }));
   },
+
+  renameRoom: (roomId: string, name: string) =>
+    set((state) => ({
+      rooms: state.rooms.map((r) => (r.id === roomId ? { ...r, name } : r)),
+    })),
 
   updateRoomPoints: (roomId: string, points: number[]) =>
     set((state) => ({
