@@ -49,11 +49,13 @@ export default function CanvasStage() {
   const rooms = useAppStore((s) => s.rooms);
   const pipes = useAppStore((s) => s.pipes);
   const drawingPipePoints = useAppStore((s) => s.drawingPipePoints);
+  const selectedId = useAppStore((s) => s.selectedId);
 
   const addRoom = useAppStore((s) => s.addRoom);
-  const setSelectedRoom = useAppStore((s) => s.setSelectedRoom);
+  const setSelectedId = useAppStore((s) => s.setSelectedId);
   const addPipe = useAppStore((s) => s.addPipe);
   const setDrawingPipePoints = useAppStore((s) => s.setDrawingPipePoints);
+  const deleteEntity = useAppStore((s) => s.deleteEntity);
 
   // Filter entities for active floor
   const floorRooms = rooms.filter((r) => r.floorId === activeFloorId);
@@ -82,6 +84,23 @@ export default function CanvasStage() {
     return () => observer.disconnect();
   }, []);
 
+  // ── Keyboard Deletion ───────────────────────────────────────────
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (
+        (e.key === 'Backspace' || e.key === 'Delete') &&
+        canvasMode === 'select' &&
+        selectedId
+      ) {
+        deleteEntity(selectedId);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [canvasMode, selectedId, deleteEntity]);
+
   // ── Click handler ───────────────────────────────────────────────
 
   const handleStageClick = useCallback(
@@ -106,12 +125,12 @@ export default function CanvasStage() {
         case 'select':
           // Only deselect if clicking on the stage background (not a shape)
           if (e.target === stage) {
-            setSelectedRoom(null);
+            setSelectedId(null);
           }
           break;
       }
     },
-    [canvasMode, activeFloorId, drawingPipePoints, addRoom, setDrawingPipePoints, setSelectedRoom],
+    [canvasMode, activeFloorId, drawingPipePoints, addRoom, setDrawingPipePoints, setSelectedId],
   );
 
   // ── Double-click to finalize pipe ───────────────────────────────
@@ -151,9 +170,9 @@ export default function CanvasStage() {
         width={dimensions.width}
         height={dimensions.height}
         onClick={handleStageClick}
-        onTap={handleStageClick}
+        onTap={handleStageClick as any}
         onDblClick={handleStageDblClick}
-        onDblTap={handleStageDblClick}
+        onDblTap={handleStageDblClick as any}
       >
         {/* Grid layer (non-interactive) */}
         <Layer listening={false}>
@@ -162,20 +181,20 @@ export default function CanvasStage() {
 
         {/* Content layer */}
         <Layer>
-          {/* Rendered pipes */}
+          {/* Rooms (Bottom layer) */}
+          {floorRooms.map((room) => (
+            <RoomShape key={room.id} room={room} />
+          ))}
+
+          {/* Rendered pipes (Middle layer) */}
           {floorPipes.map((pipe) => (
             <PipeShape key={pipe.id} pipe={pipe} />
           ))}
 
-          {/* In-progress drawing pipe */}
+          {/* In-progress drawing pipe (Top layer) */}
           {drawingPipePoints.length > 0 && (
             <DrawingPipe points={drawingPipePoints} />
           )}
-
-          {/* Rooms */}
-          {floorRooms.map((room) => (
-            <RoomShape key={room.id} room={room} />
-          ))}
         </Layer>
       </Stage>
     </div>

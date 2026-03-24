@@ -59,7 +59,7 @@ interface AppState {
 
   // Canvas state
   canvasMode: CanvasMode;
-  selectedRoomId: string | null;
+  selectedId: string | null;
   drawingPipePoints: number[];
 
   // Floor actions
@@ -69,7 +69,8 @@ interface AppState {
 
   // Canvas actions
   setCanvasMode: (mode: CanvasMode) => void;
-  setSelectedRoom: (id: string | null) => void;
+  setSelectedId: (id: string | null) => void;
+  deleteEntity: (id: string) => void;
 
   // Room actions
   addRoom: (floorId: string, x: number, y: number) => void;
@@ -111,7 +112,7 @@ export const useAppStore = create<AppState>((set) => ({
   activeFloorId: DEFAULT_FLOOR.id,
 
   canvasMode: 'select',
-  selectedRoomId: null,
+  selectedId: null,
   drawingPipePoints: [],
 
   // ── Floor actions ───────────────────────────────────────────────
@@ -137,11 +138,18 @@ export const useAppStore = create<AppState>((set) => ({
   setCanvasMode: (mode: CanvasMode) =>
     set({
       canvasMode: mode,
-      selectedRoomId: null,
+      selectedId: null,
       drawingPipePoints: [],
     }),
 
-  setSelectedRoom: (id: string | null) => set({ selectedRoomId: id }),
+  setSelectedId: (id: string | null) => set({ selectedId: id }),
+
+  deleteEntity: (id: string) =>
+    set((state) => ({
+      rooms: state.rooms.filter((r) => r.id !== id),
+      pipes: state.pipes.filter((p) => p.id !== id),
+      selectedId: state.selectedId === id ? null : state.selectedId,
+    })),
 
   // ── Room actions ────────────────────────────────────────────────
 

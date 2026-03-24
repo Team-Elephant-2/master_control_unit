@@ -10,13 +10,21 @@ interface RoomShapeProps {
   room: Room;
 }
 
+const SNAP_DIST = 15;
+
 export default function RoomShape({ room }: RoomShapeProps) {
   const canvasMode = useAppStore((s) => s.canvasMode);
-  const selectedRoomId = useAppStore((s) => s.selectedRoomId);
-  const setSelectedRoom = useAppStore((s) => s.setSelectedRoom);
+  const selectedId = useAppStore((s) => s.selectedId);
+  const setSelectedId = useAppStore((s) => s.setSelectedId);
   const updateRoomPoints = useAppStore((s) => s.updateRoomPoints);
+  const allRooms = useAppStore((s) => s.rooms);
 
-  const isSelected = selectedRoomId === room.id;
+  // We snap only to other rooms on the same floor
+  const otherRooms = allRooms.filter(
+    (r) => r.id !== room.id && r.floorId === room.floorId
+  );
+
+  const isSelected = selectedId === room.id;
   const pts = room.polygonPoints;
 
   // Convert flat array to pairs for anchor rendering
@@ -26,24 +34,144 @@ export default function RoomShape({ room }: RoomShapeProps) {
   }
 
   // Compute centroid for the label
-  const cx = anchorPairs.reduce((s, p) => s + p[0], 0) / anchorPairs.length;
-  const cy = anchorPairs.reduce((s, p) => s + p[1], 0) / anchorPairs.length;
+  const cx = anchorPairs.reduce((s, p) => s + p[0], 0) / Math.max(1, anchorPairs.length);
+  const cy = anchorPairs.reduce((s, p) => s + p[1], 0) / Math.max(1, anchorPairs.length);
+
+  // ── Handlers ──────────────────────────────────────────────────────
 
   const handleClick = (e: KonvaEventObject<MouseEvent>) => {
     if (canvasMode !== 'select') return;
     e.cancelBubble = true;
-    setSelectedRoom(room.id);
+    setSelectedId(room.id);
+  };
+
+  // Double-click on the room border to insert an anchor point
+  const handleLineDblClick = (e: KonvaEventObject<MouseEvent>) => {
+    if (canvasMode !== 'select' || !isSelected) return;
+    e.cancelBubble = true;
+
+    const stage = e.target.getStage();
+    if (!stage) return;
+    const pos = stage.getPointerPosition();
+    if (!pos) return;
+
+    let minLineDist = Infinity;
+    let bestInsertIndex = -1;
+
+    // Find the closest line segment
+    for (let i = 0; i < anchorPairs.length; i++) {
+      const p1 = anchorPairs[i];
+      const p2 = anchorPairs[(i + 1) % anchorPairs.length];
+
+      const l2 = Math.pow(p1[0] - p2[0], 2) + Math.pow(p1[1] - p2[1], 2);
+      if (l2 === 0) continue;
+
+      let t = ((pos.x - p1[0]) * (p2[0] - p1[0]) + (pos.y - p1[1]) * (p2[1] - p1[1])) / l2;
+      t = Math.max(0, Math.min(1, t));
+      const projX = p1[0] + t * (p2[0] - p1[0]);
+      const projY = p1[1] + t * (p2[1] - p1[1]);
+      const dist = Math.hypot(pos.x - projX, pos.y - projY);
+
+      if (dist < minLineDist) {
+        minLineDist = dist;
+        bestInsertIndex = i + 1;
+      }
+    }
+
+    // Insert point if we clicked reasonably close to the stroke
+    if (bestInsertIndex !== -1 && minLineDist < 15) {
+      const newPts = [...pts];
+      newPts.splice(bestInsertIndex * 2, 0, pos.x, pos.y);
+      updateRoomPoints(room.id, newPts);
+    }
+  };
+
+  // ── Drag & Drop ───────────────────────────────────────────────────
+
+  // Magnetic snapping for entire group drag
+  const groupDragBoundFunc = (pos: { x: number; y: number }) => {
+    const dx = pos.x;
+    const dy = pos.y;
+    let bestDx = dx;
+    let bestDy = dy;
+    let minD = SNAP_DIST;
+
+    for (let i = 0; i < pts.length; i += 2) {
+      const curX = pts[i] + dx;
+      const curY = pts[i + 1] + dy;
+
+      for (const r of otherRooms) {
+        const rpts = r.polygonPoints;
+        for (let j = 0; j < rpts.length; j += 2) {
+          const rx = rpts[j];
+          const ry = rpts[j + 1];
+          const dist = Math.hypot(rx - curX, ry - curY);
+          if (dist < minD) {
+            minD = dist;
+            bestDx = rx - pts[i];
+            bestDy = ry - pts[i + 1];
+          }
+        }
+      }
+    }
+    return { x: bestDx, y: bestDy };
+  };
+
+  const handleGroupDragEnd = (e: KonvaEventObject<DragEvent>) => {
+    if (e.target.name() !== 'room-group') return; // Ignore anchor drags
+    const dx = e.target.x();
+    const dy = e.target.y();
+
+    // Reset group position to 0,0 and bake the delta into points
+    e.target.position({ x: 0, y: 0 });
+
+    if (dx !== 0 || dy !== 0) {
+      const newPoints = pts.map((val, i) => (i % 2 === 0 ? val + dx : val + dy));
+      updateRoomPoints(room.id, newPoints);
+    }
+  };
+
+  // Magnetic snapping for single anchor drag
+  const anchorDragBoundFunc = (pos: { x: number; y: number }) => {
+    let snapX = pos.x;
+    let snapY = pos.y;
+    let minD = SNAP_DIST;
+
+    for (const r of otherRooms) {
+      const rpts = r.polygonPoints;
+      for (let j = 0; j < rpts.length; j += 2) {
+        const rx = rpts[j];
+        const ry = rpts[j + 1];
+        const dist = Math.hypot(rx - pos.x, ry - pos.y);
+        if (dist < minD) {
+          minD = dist;
+          snapX = rx;
+          snapY = ry;
+        }
+      }
+    }
+    return { x: snapX, y: snapY };
   };
 
   const handleAnchorDrag = (index: number, e: KonvaEventObject<DragEvent>) => {
+    e.cancelBubble = true;
     const newPoints = [...pts];
     newPoints[index * 2] = e.target.x();
     newPoints[index * 2 + 1] = e.target.y();
     updateRoomPoints(room.id, newPoints);
   };
 
+  // ── Render ────────────────────────────────────────────────────────
+
   return (
-    <Group>
+    <Group
+      name="room-group"
+      draggable={isSelected && canvasMode === 'select'}
+      dragBoundFunc={groupDragBoundFunc}
+      onDragEnd={handleGroupDragEnd}
+      onClick={handleClick}
+      onTap={handleClick as any}
+    >
       {/* Room polygon fill */}
       <Line
         points={pts}
@@ -51,9 +179,17 @@ export default function RoomShape({ room }: RoomShapeProps) {
         fill={isSelected ? '#e0f2fe' : '#f0f9ff'}
         stroke={isSelected ? '#38bdf8' : '#cbd5e1'}
         strokeWidth={isSelected ? 2 : 1.5}
-        onClick={handleClick}
-        onTap={handleClick}
-        hitStrokeWidth={12}
+        hitStrokeWidth={15}
+        onDblClick={handleLineDblClick}
+        onDblTap={handleLineDblClick as any}
+        onMouseEnter={(e) => {
+          const container = e.target.getStage()?.container();
+          if (container && isSelected) container.style.cursor = 'move';
+        }}
+        onMouseLeave={(e) => {
+          const container = e.target.getStage()?.container();
+          if (container) container.style.cursor = 'default';
+        }}
       />
 
       {/* Room label */}
@@ -66,13 +202,15 @@ export default function RoomShape({ room }: RoomShapeProps) {
         fontSize={11}
         fontFamily="Inter, system-ui, sans-serif"
         fill="#64748b"
+        listening={false}
       />
 
-      {/* Draggable anchor points (only when selected) */}
+      {/* Draggable anchor points */}
       {isSelected &&
         anchorPairs.map(([ax, ay], i) => (
           <Circle
             key={i}
+            name="anchor"
             x={ax}
             y={ay}
             radius={5}
@@ -80,7 +218,9 @@ export default function RoomShape({ room }: RoomShapeProps) {
             stroke="#0ea5e9"
             strokeWidth={2}
             draggable
+            dragBoundFunc={anchorDragBoundFunc}
             onDragMove={(e) => handleAnchorDrag(i, e)}
+            onDragEnd={(e) => e.cancelBubble = true}
             onMouseEnter={(e) => {
               const container = e.target.getStage()?.container();
               if (container) container.style.cursor = 'grab';
