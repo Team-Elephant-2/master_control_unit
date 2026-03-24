@@ -78,6 +78,7 @@ interface AppState {
 
   // Pipe actions
   addPipe: (floorId: string, points: number[]) => void;
+  updatePipePoints: (pipeId: string, points: number[]) => void;
   setDrawingPipePoints: (points: number[]) => void;
   clearDrawingPipe: () => void;
 }
@@ -136,10 +137,16 @@ export const useAppStore = create<AppState>((set) => ({
   // ── Canvas actions ──────────────────────────────────────────────
 
   setCanvasMode: (mode: CanvasMode) =>
-    set({
-      canvasMode: mode,
-      selectedId: null,
-      drawingPipePoints: [],
+    set((state) => {
+      // Auto-save pipe if switching away from 'draw_pipe' and we have enough points
+      if (state.canvasMode === 'draw_pipe' && state.drawingPipePoints.length >= 4) {
+        state.addPipe(state.activeFloorId!, state.drawingPipePoints);
+      }
+      return {
+        canvasMode: mode,
+        selectedId: null,
+        drawingPipePoints: [],
+      };
     }),
 
   setSelectedId: (id: string | null) => set({ selectedId: id }),
@@ -192,6 +199,11 @@ export const useAppStore = create<AppState>((set) => ({
       drawingPipePoints: [],
     }));
   },
+
+  updatePipePoints: (pipeId: string, points: number[]) =>
+    set((state) => ({
+      pipes: state.pipes.map((p) => (p.id === pipeId ? { ...p, points } : p)),
+    })),
 
   setDrawingPipePoints: (points: number[]) =>
     set({ drawingPipePoints: points }),
