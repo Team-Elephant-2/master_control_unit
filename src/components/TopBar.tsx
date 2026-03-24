@@ -6,10 +6,13 @@ import { useAppStore } from '@/store/useAppStore';
 export default function TopBar() {
   const sensors = useAppStore((s) => s.sensors);
 
-  // Compute aggregate flow from all master_flow sensors
-  const totalFlow = sensors
-    .filter((s) => s.type === 'master_flow')
-    .reduce((sum, s) => sum + 0, 0); // TODO: Add physical readings to store later
+  const activeFloorId = useAppStore((s) => s.activeFloorId);
+
+  // Find the master flow sensor for the active floor
+  const masterSensor = sensors.find(
+    (s) => s.type === 'master_flow' && s.floorId === activeFloorId && s.isMaster
+  );
+  const totalFlowDisplay = masterSensor ? '15.2' : '--';
 
   // Determine system status — green if no water_drop sensors are wet
   const hasLeak = sensors.some(
@@ -35,9 +38,9 @@ export default function TopBar() {
         {/* Total Flow */}
         <div className="flex items-center gap-2 text-sm text-slate-600">
           <Activity className="h-4 w-4 text-slate-400" />
-          <span className="font-medium text-slate-500">Total Flow</span>
+          <span className="font-medium text-slate-500">Floor Total Flow</span>
           <span className="font-semibold tabular-nums text-slate-900">
-            {totalFlow.toFixed(1)} L/m
+            {totalFlowDisplay} L/m
           </span>
         </div>
 

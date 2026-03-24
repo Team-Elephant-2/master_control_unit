@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { Info, Map as MapIcon, Edit2, Droplet, Droplets, CloudRain, Zap, Waves, DoorClosed, Cpu } from 'lucide-react';
+import { Info, Map as MapIcon, Edit2, Droplet, Droplets, CloudRain, Zap, Waves, DoorClosed, Cpu, CheckCircle } from 'lucide-react';
 import { useAppStore, type SensorType } from '@/store/useAppStore';
 
 const SENSOR_TYPES: { type: SensorType; label: string; Icon: React.ElementType }[] = [
@@ -12,34 +12,85 @@ const SENSOR_TYPES: { type: SensorType; label: string; Icon: React.ElementType }
   { type: 'valve', label: 'Valve', Icon: DoorClosed },
 ];
 
+function getMockReading(type: SensorType): string {
+  switch(type) {
+    case 'master_flow': return 'Flow: 15.2 L/m';
+    case 'humidity': return 'Hum: 42%';
+    case 'water_drop': return 'Status: DRY';
+    case 'pump': return 'Status: ON';
+    case 'valve': return 'Gate: OPEN';
+  }
+}
+
 export default function RightSidebar() {
   const selectedId = useAppStore((s) => s.selectedId);
   const rooms = useAppStore((s) => s.rooms);
   const sensors = useAppStore((s) => s.sensors);
   const renameRoom = useAppStore((s) => s.renameRoom);
   const updateSensorHardwareId = useAppStore((s) => s.updateSensorHardwareId);
+  const setMasterSensor = useAppStore((s) => s.setMasterSensor);
   
   const canvasMode = useAppStore((s) => s.canvasMode);
   const selectedSensorType = useAppStore((s) => s.selectedSensorType);
   const setSelectedSensorType = useAppStore((s) => s.setSelectedSensorType);
+  const focusedRoomId = useAppStore((s) => s.focusedRoomId);
+  const activeFloorId = useAppStore((s) => s.activeFloorId);
 
   // Find if a room or sensor is selected
   const selectedRoom = rooms.find((r) => r.id === selectedId);
   const selectedSensor = sensors.find((s) => s.id === selectedId);
 
+  // Zone Metrics
+  const focusedRoom = focusedRoomId ? rooms.find(r => r.id === focusedRoomId) : null;
+  const zoneSensors = focusedRoomId ? sensors.filter(s => s.roomId === focusedRoomId) : [];
+
   return (
-    <aside className="fixed right-0 top-14 bottom-0 z-40 flex w-64 flex-col border-l border-slate-200 bg-white">
+    <aside className="fixed right-0 top-14 bottom-0 z-40 flex w-72 flex-col border-l border-slate-200 bg-white">
       {/* Heading */}
       <div className="flex items-center gap-2 px-4 py-3.5 border-b border-slate-100">
         <Info className="h-4 w-4 text-slate-400" />
         <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">
-          {canvasMode === 'add_sensor' ? 'Hardware Palette' : 'Details'}
+          {focusedRoomId ? 'Zone Metrics' : canvasMode === 'add_sensor' ? 'Hardware Palette' : 'Details'}
         </span>
       </div>
 
       {/* Content */}
       <div className="flex-1 overflow-y-auto">
-        {canvasMode === 'add_sensor' ? (
+        {focusedRoomId && focusedRoom ? (
+           <div className="p-4 space-y-4">
+             <div>
+               <h2 className="text-lg font-bold text-slate-800 tracking-tight">{focusedRoom.name}</h2>
+               <p className="text-xs text-slate-500 mt-1">Live Sensor Telemetry</p>
+             </div>
+             
+             {zoneSensors.length === 0 ? (
+               <div className="rounded-lg border border-dashed border-slate-300 p-6 text-center text-sm text-slate-400">
+                 No hardware mapped to this zone.
+               </div>
+             ) : (
+               <div className="space-y-3">
+                 {zoneSensors.map(s => {
+                   const conf = SENSOR_TYPES.find(t => t.type === s.type);
+                   const Icon = conf?.Icon || Cpu;
+                   return (
+                     <div key={s.id} className="flex items-center justify-between p-3 rounded-lg border border-slate-100 bg-slate-50 shadow-sm">
+                       <div className="flex items-center gap-3">
+                         <div className="p-1.5 rounded bg-white shadow-sm text-indigo-500">
+                           <Icon className="h-4 w-4" />
+                         </div>
+                         <div>
+                           <div className="text-xs font-bold text-slate-700">{conf?.label} ({s.hardwareId})</div>
+                           <div className="text-[10px] text-slate-500 uppercase tracking-wider">{getMockReading(s.type)}</div>
+                         </div>
+                       </div>
+                       {s.type === 'water_drop' && <CheckCircle className="h-4 w-4 text-emerald-500" />}
+                     </div>
+                   );
+                 })}
+               </div>
+             )}
+           </div>
+        ) : canvasMode === 'add_sensor' ? (
           <div className="p-4 space-y-4">
              <h2 className="text-sm font-semibold text-slate-800 tracking-tight">Select Hardware</h2>
              <div className="flex flex-col gap-2">
@@ -87,7 +138,7 @@ export default function RightSidebar() {
               />
             </div>
 
-            {/* Geometry Info (Quick Look) */}
+            {/* Geometry Info */}
             <div className="rounded-lg bg-slate-50 p-3 border border-slate-100">
               <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-2">Geometry</span>
               <div className="grid grid-cols-2 gap-2 text-[11px]">
@@ -129,6 +180,34 @@ export default function RightSidebar() {
                 placeholder="Enter integer ID..."
               />
             </div>
+            
+            {/* Master Assignment Toggle */}
+            {selectedSensor.type === 'master_flow' && (
+               <div className="p-4 rounded-lg bg-orange-50 border border-orange-100">
+                 <div className="flex items-center justify-between mb-2">
+                   <span className="text-xs font-bold text-orange-800">Master Flow Sensor</span>
+                   <button 
+                     onClick={() => {
+                        if (activeFloorId) {
+                           // If already master, clicking does nothing or disables? Prompt says "When toggled ON... map through others...". Let's make it toggleable.
+                           // Actually the store lets us just set it. 
+                           // If it's already master, and we want to untoggle it? 
+                           useAppStore.getState().setMasterSensor(
+                             selectedSensor.isMaster ? '' : selectedSensor.id, 
+                             activeFloorId
+                           );
+                        }
+                     }}
+                     className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center justify-center rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 ${selectedSensor.isMaster ? 'bg-orange-500' : 'bg-slate-300'}`}
+                   >
+                     <span aria-hidden="true" className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${selectedSensor.isMaster ? 'translate-x-4' : 'translate-x-0'}`} />
+                   </button>
+                 </div>
+                 <p className="text-[10px] text-orange-600 leading-tight">
+                   Enable this to aggregate all floor telemetry to this core hardware node. Only one master allowed per floor.
+                 </p>
+               </div>
+            )}
 
             {/* Location Info */}
             <div className="rounded-lg bg-slate-50 p-3 border border-slate-100">
@@ -155,7 +234,7 @@ export default function RightSidebar() {
       </div>
 
       {/* Footer / Meta (Optional) */}
-      {(selectedRoom || selectedSensor) && canvasMode !== 'add_sensor' && (
+      {(selectedRoom || selectedSensor) && canvasMode !== 'add_sensor' && !focusedRoomId && (
         <div className="p-4 border-t border-slate-50">
           <button 
              onClick={() => useAppStore.getState().deleteEntity(selectedId!)}

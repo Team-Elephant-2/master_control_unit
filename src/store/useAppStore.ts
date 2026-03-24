@@ -49,6 +49,7 @@ export interface Sensor {
   roomId: string | null;
   x: number;
   y: number;
+  isMaster?: boolean;
 }
 
 // ── Store Shape ─────────────────────────────────────────────────────
@@ -66,6 +67,7 @@ interface AppState {
   selectedId: string | null;
   drawingPipePoints: number[];
   selectedSensorType: SensorType;
+  focusedRoomId: string | null;
 
   // Floor actions
   addFloor: (name: string) => void;
@@ -77,6 +79,7 @@ interface AppState {
   setSelectedId: (id: string | null) => void;
   deleteEntity: (id: string) => void;
   setSelectedSensorType: (type: SensorType) => void;
+  setFocusedRoomId: (id: string | null) => void;
 
   // Room actions
   addRoom: (floorId: string, x: number, y: number) => void;
@@ -93,6 +96,7 @@ interface AppState {
   addSensor: (sensor: Omit<Sensor, 'id'>) => void;
   updateSensorPosition: (id: string, x: number, y: number, roomId: string | null) => void;
   updateSensorHardwareId: (id: string, hardwareId: number) => void;
+  setMasterSensor: (sensorId: string, floorId: string) => void;
 }
 
 // ── Helpers ─────────────────────────────────────────────────────────
@@ -128,6 +132,7 @@ export const useAppStore = create<AppState>((set) => ({
   selectedId: null,
   drawingPipePoints: [],
   selectedSensorType: 'master_flow',
+  focusedRoomId: null,
 
   // ── Floor actions ───────────────────────────────────────────────
 
@@ -170,9 +175,12 @@ export const useAppStore = create<AppState>((set) => ({
       pipes: state.pipes.filter((p) => p.id !== id),
       sensors: state.sensors.filter((s) => s.id !== id),
       selectedId: state.selectedId === id ? null : state.selectedId,
+      focusedRoomId: state.focusedRoomId === id ? null : state.focusedRoomId,
     })),
 
   setSelectedSensorType: (type: SensorType) => set({ selectedSensorType: type }),
+
+  setFocusedRoomId: (id: string | null) => set({ focusedRoomId: id }),
 
   // ── Room actions ────────────────────────────────────────────────
 
@@ -252,5 +260,16 @@ export const useAppStore = create<AppState>((set) => ({
       sensors: state.sensors.map((s) =>
         s.id === id ? { ...s, hardwareId } : s
       ),
+    })),
+
+  setMasterSensor: (sensorId: string, floorId: string) =>
+    set((state) => ({
+      sensors: state.sensors.map((s) => {
+        // Only affect waterflow sensors on this floor
+        if (s.type === 'master_flow' && s.floorId === floorId) {
+          return { ...s, isMaster: s.id === sensorId };
+        }
+        return s;
+      }),
     })),
 }));

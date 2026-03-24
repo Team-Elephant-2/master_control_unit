@@ -6,6 +6,9 @@ import { getClosestPointOnPipes, findRoomForPoint } from '@/utils/geometry';
 
 interface SensorShapeProps {
   sensor: Sensor;
+  opacity?: number;
+  onHoverIn?: (x: number, y: number) => void;
+  onHoverOut?: () => void;
 }
 
 const TYPE_CONFIG: Record<SensorType, { 
@@ -52,7 +55,7 @@ const TYPE_CONFIG: Record<SensorType, {
   },
 };
 
-export default function SensorShape({ sensor }: SensorShapeProps) {
+export default function SensorShape({ sensor, opacity = 1, onHoverIn, onHoverOut }: SensorShapeProps) {
   const canvasMode = useAppStore((s) => s.canvasMode);
   const selectedId = useAppStore((s) => s.selectedId);
   const setSelectedId = useAppStore((s) => s.setSelectedId);
@@ -99,17 +102,57 @@ export default function SensorShape({ sensor }: SensorShapeProps) {
       onDragEnd={handleDragEnd}
       onClick={handleClick}
       onTap={handleClick as any}
+      opacity={opacity}
       onMouseEnter={(e) => {
-        const container = e.target.getStage()?.container();
-        if (container && canvasMode === 'select') {
-          container.style.cursor = isSelected ? 'move' : 'pointer';
+        if (canvasMode === 'select') {
+          const container = e.target.getStage()?.container();
+          if (container) container.style.cursor = isSelected ? 'move' : 'pointer';
+        }
+        
+        if (onHoverIn) {
+           const stage = e.target.getStage();
+           if (stage) {
+             const pos = stage.getPointerPosition();
+             if (pos) {
+                const absTransform = stage.getAbsoluteTransform();
+                const screenPos = { x: pos.x * absTransform.m[0] + absTransform.m[4], y: pos.y * absTransform.m[3] + absTransform.m[5] };
+                onHoverIn(screenPos.x, screenPos.y - 10);
+             }
+           }
         }
       }}
       onMouseLeave={(e) => {
         const container = e.target.getStage()?.container();
         if (container) container.style.cursor = 'default';
+        if (onHoverOut) onHoverOut();
+      }}
+      onMouseMove={(e) => {
+         if (onHoverIn) {
+            const stage = e.target.getStage();
+            if (stage) {
+               const pos = stage.getPointerPosition();
+               if (pos) {
+                 const absTransform = stage.getAbsoluteTransform();
+                 const screenPos = { x: pos.x * absTransform.m[0] + absTransform.m[4], y: pos.y * absTransform.m[3] + absTransform.m[5] };
+                 onHoverIn(screenPos.x, screenPos.y - 10);
+               }
+            }
+         }
       }}
     >
+      {/* Selection / Master Glow Background */}
+      {(isSelected || sensor.isMaster) && (
+        <Circle
+          radius={26}
+          fill="transparent"
+          stroke={sensor.isMaster ? '#f59e0b' : '#38bdf8'}
+          strokeWidth={sensor.isMaster ? 4 : 3}
+          opacity={sensor.isMaster ? 0.8 : 0.6}
+          shadowColor={sensor.isMaster ? '#f59e0b' : undefined}
+          shadowBlur={sensor.isMaster ? 15 : 0}
+          shadowOpacity={sensor.isMaster ? 0.6 : 0}
+        />
+      )}
       {/* Top Label (Type) */}
       <Text
         text={config.label}

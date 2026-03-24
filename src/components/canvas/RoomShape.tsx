@@ -6,11 +6,12 @@ import type { KonvaEventObject } from 'konva/lib/Node';
 
 interface RoomShapeProps {
   room: Room;
+  opacity?: number;
 }
 
 const SNAP_DIST = 15;
 
-export default function RoomShape({ room }: RoomShapeProps) {
+export default function RoomShape({ room, opacity = 1 }: RoomShapeProps) {
   const lineRef = useRef<any>(null);
   const trRef = useRef<any>(null);
 
@@ -20,6 +21,7 @@ export default function RoomShape({ room }: RoomShapeProps) {
   const updateRoomPoints = useAppStore((s) => s.updateRoomPoints);
   const renameRoom = useAppStore((s) => s.renameRoom);
   const allRooms = useAppStore((s) => s.rooms);
+  const setFocusedRoomId = useAppStore((s) => s.setFocusedRoomId);
 
   const isSelected = selectedId === room.id;
   const pts = room.polygonPoints;
@@ -76,6 +78,7 @@ export default function RoomShape({ room }: RoomShapeProps) {
     if (canvasMode !== 'select') return;
     e.cancelBubble = true;
     setSelectedId(room.id);
+    setFocusedRoomId(room.id);
   };
 
   const handleLineDblClick = (e: KonvaEventObject<MouseEvent>) => {
@@ -190,6 +193,7 @@ export default function RoomShape({ room }: RoomShapeProps) {
       name="room-group"
       draggable={canvasMode === 'select'}
       dragBoundFunc={groupDragBoundFunc}
+      opacity={opacity}
       onDragEnd={(e) => {
         if (e.target.name() === 'room-group') bakeTransform(e.target);
       }}

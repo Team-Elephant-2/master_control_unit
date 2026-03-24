@@ -8,9 +8,10 @@ import type { KonvaEventObject } from 'konva/lib/Node';
 
 interface PipeShapeProps {
   pipe: Pipe;
+  opacity?: number;
 }
 
-export default function PipeShape({ pipe }: PipeShapeProps) {
+export default function PipeShape({ pipe, opacity = 1 }: PipeShapeProps) {
   const canvasMode = useAppStore((s) => s.canvasMode);
   const selectedId = useAppStore((s) => s.selectedId);
   const setSelectedId = useAppStore((s) => s.setSelectedId);
@@ -79,7 +80,7 @@ export default function PipeShape({ pipe }: PipeShapeProps) {
   };
 
   return (
-    <Group onClick={handleClick} onTap={handleClick as any}>
+    <Group onClick={handleClick} onTap={handleClick as any} opacity={opacity}>
       {/* Selection highlight backdrop */}
       {isSelected && (
         <Line
