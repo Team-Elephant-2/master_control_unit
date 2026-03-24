@@ -11,7 +11,7 @@ interface RoomShapeProps {
 const SNAP_DIST = 15;
 
 export default function RoomShape({ room }: RoomShapeProps) {
-  const shapeRef = useRef<any>(null);
+  const lineRef = useRef<any>(null);
   const trRef = useRef<any>(null);
 
   const canvasMode = useAppStore((s) => s.canvasMode);
@@ -26,8 +26,8 @@ export default function RoomShape({ room }: RoomShapeProps) {
   // ── Transformer attachment ────────────────────────────────────────
 
   useEffect(() => {
-    if (isSelected && trRef.current && shapeRef.current) {
-      trRef.current.nodes([shapeRef.current]);
+    if (isSelected && trRef.current && lineRef.current) {
+      trRef.current.nodes([lineRef.current]);
       trRef.current.getLayer().batchDraw();
     }
   }, [isSelected]);
@@ -95,41 +95,21 @@ export default function RoomShape({ room }: RoomShapeProps) {
 
   // ── Drag & Transform ─────────────────────────────────────────────
 
-  const groupDragBoundFunc = (pos: { x: number; y: number }) => {
-    const dx = pos.x;
-    const dy = pos.y;
-    let bestDx = dx;
-    let bestDy = dy;
-    let minD = SNAP_DIST;
-
-    for (let i = 0; i < pts.length; i += 2) {
-      const curX = pts[i] + dx;
-      const curY = pts[i + 1] + dy;
-
-      for (const r of otherRooms) {
-        const rpts = r.polygonPoints;
-        for (let j = 0; j < rpts.length; j += 2) {
-          const rx = rpts[j];
-          const ry = rpts[j + 1];
-          const dist = Math.hypot(rx - curX, ry - curY);
-          if (dist < minD) {
-            minD = dist;
-            bestDx = rx - pts[i];
-            bestDy = ry - pts[i + 1];
-          }
-        }
-      }
-    }
-    return { x: bestDx, y: bestDy };
-  };
-
   const bakeTransform = (node: any) => {
-    const transform = node.getTransform();
-    const newPoints = [];
+    const stage = node.getStage();
+    if (!stage) return;
+
+    const absTransform = node.getAbsoluteTransform();
+    const stageAbsInverted = stage.getAbsoluteTransform().copy().invert();
+    
+    const newPoints: number[] = [];
     for (let i = 0; i < pts.length; i += 2) {
-      const point = transform.point({ x: pts[i], y: pts[i + 1] });
-      newPoints.push(point.x, point.y);
+      // Get absolute pos, then convert back to stage coordinates
+      const absPos = absTransform.point({ x: pts[i], y: pts[i + 1] });
+      const stagePos = stageAbsInverted.point(absPos);
+      newPoints.push(stagePos.x, stagePos.y);
     }
+
     // Reset node
     node.setAttrs({
       x: 0,
@@ -182,15 +162,13 @@ export default function RoomShape({ room }: RoomShapeProps) {
   return (
     <Group
       name="room-group"
-      ref={shapeRef}
       draggable={isSelected && canvasMode === 'select'}
-      dragBoundFunc={groupDragBoundFunc}
       onDragEnd={handleGroupDragEnd}
-      onTransformEnd={handleTransformEnd}
       onClick={handleClick}
       onTap={handleClick as any}
     >
       <Line
+        ref={lineRef}
         points={pts}
         closed
         fill={isSelected ? '#e0f2fe' : '#f0f9ff'}
@@ -199,6 +177,7 @@ export default function RoomShape({ room }: RoomShapeProps) {
         hitStrokeWidth={15}
         onDblClick={handleLineDblClick}
         onDblTap={handleLineDblClick as any}
+        onTransformEnd={handleTransformEnd}
         onMouseEnter={(e) => {
           const container = e.target.getStage()?.container();
           if (container && isSelected) container.style.cursor = 'move';
@@ -228,7 +207,7 @@ export default function RoomShape({ room }: RoomShapeProps) {
             name="anchor"
             x={ax}
             y={ay}
-            radius={5}
+            radius={isSelected ? 5 : 4}
             fill="#ffffff"
             stroke="#0ea5e9"
             strokeWidth={2}
@@ -253,14 +232,10 @@ export default function RoomShape({ room }: RoomShapeProps) {
           rotateEnabled={false}
           flipEnabled={false}
           enabledAnchors={[
-            'top-left',
             'top-center',
-            'top-right',
             'middle-right',
             'middle-left',
-            'bottom-left',
             'bottom-center',
-            'bottom-right',
           ]}
           boundBoxFunc={(oldBox, newBox) => {
             if (Math.abs(newBox.width) < 10 || Math.abs(newBox.height) < 10) {
