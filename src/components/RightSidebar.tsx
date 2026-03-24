@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { Info, Map as MapIcon, Edit2, Droplet, Droplets, CloudRain, Zap, Waves, DoorClosed, Cpu, CheckCircle } from 'lucide-react';
-import { useAppStore, type SensorType } from '@/store/useAppStore';
+import { useAppStore, type Sensor, type SensorType } from '@/store/useAppStore';
 
 const SENSOR_TYPES: { type: SensorType; label: string; Icon: React.ElementType }[] = [
   { type: 'master_flow', label: 'Waterflow', Icon: Waves },
@@ -12,13 +12,13 @@ const SENSOR_TYPES: { type: SensorType; label: string; Icon: React.ElementType }
   { type: 'valve', label: 'Valve', Icon: DoorClosed },
 ];
 
-function getMockReading(type: SensorType): string {
-  switch(type) {
-    case 'master_flow': return 'Flow: 15.2 L/m';
-    case 'humidity': return 'Hum: 42%';
-    case 'water_drop': return 'Status: DRY';
-    case 'pump': return 'Status: ON';
-    case 'valve': return 'Gate: OPEN';
+function getLiveReading(sensor: Sensor): string {
+  switch(sensor.type) {
+    case 'master_flow': return `Flow: ${sensor.value || 0} L/m`;
+    case 'humidity': return `Hum: ${sensor.value || 42}%`;
+    case 'water_drop': return `Status: ${sensor.isWet ? 'LEAK DETECTED' : 'DRY'}`;
+    case 'pump': return `Status: ${sensor.isOn ? 'ON' : 'OFF'}`;
+    case 'valve': return `Gate: ${sensor.isOpen ? 'OPEN' : 'BLOCKED'}`;
   }
 }
 
@@ -80,7 +80,7 @@ export default function RightSidebar() {
                          </div>
                          <div>
                            <div className="text-xs font-bold text-slate-700">{conf?.label} ({s.hardwareId})</div>
-                           <div className="text-[10px] text-slate-500 uppercase tracking-wider">{getMockReading(s.type)}</div>
+                           <div className="text-[10px] text-slate-500 uppercase tracking-wider">{getLiveReading(s)}</div>
                          </div>
                        </div>
                        {s.type === 'water_drop' && <CheckCircle className="h-4 w-4 text-emerald-500" />}

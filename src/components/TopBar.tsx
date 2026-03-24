@@ -2,6 +2,7 @@
 
 import { Droplets, Activity } from 'lucide-react';
 import { useAppStore } from '@/store/useAppStore';
+import SimulationBanner from './SimulationBanner';
 
 export default function TopBar() {
   const sensors = useAppStore((s) => s.sensors);
@@ -14,15 +15,14 @@ export default function TopBar() {
   );
   const totalFlowDisplay = masterSensor ? '15.2' : '--';
 
-  // Determine system status — green if no water_drop sensors are wet
-  const hasLeak = sensors.some(
-    (s) => s.type === 'water_drop' && false, // TODO: Add physical readings to store later
-  );
+  // Determine system status
+  const hasLeak = sensors.some((s) => s.type === 'water_drop' && s.isWet);
   const systemStatus = hasLeak ? 'ALERT' : 'OK';
   const statusColor = hasLeak ? 'text-red-600 bg-red-50 border-red-200' : 'text-emerald-700 bg-emerald-50 border-emerald-200';
 
   return (
-    <header className="fixed top-0 left-0 right-0 z-50 flex h-14 items-center justify-between border-b border-slate-200 bg-white px-5">
+    <>
+      <header className="fixed top-0 left-0 right-0 z-50 flex h-14 items-center justify-between border-b border-slate-200 bg-white px-5">
       {/* Brand */}
       <div className="flex items-center gap-2.5">
         <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-sky-50">
@@ -56,7 +56,9 @@ export default function TopBar() {
             {systemStatus}
           </span>
         </div>
-      </div>
-    </header>
+        </div>
+      </header>
+      <SimulationBanner />
+    </>
   );
 }

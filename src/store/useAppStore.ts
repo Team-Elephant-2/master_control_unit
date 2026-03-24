@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
 
 // ── Sensor Data Models ──────────────────────────────────────────────
 
@@ -50,6 +51,11 @@ export interface Sensor {
   x: number;
   y: number;
   isMaster?: boolean;
+  // Phase 7: Simulator State
+  isWet?: boolean;
+  value?: number;
+  isOn?: boolean;
+  isOpen?: boolean;
 }
 
 // ── Store Shape ─────────────────────────────────────────────────────
@@ -97,6 +103,13 @@ interface AppState {
   updateSensorPosition: (id: string, x: number, y: number, roomId: string | null) => void;
   updateSensorHardwareId: (id: string, hardwareId: number) => void;
   setMasterSensor: (sensorId: string, floorId: string) => void;
+
+  // Phase 7 Simulator Actions
+  simulateLeak: (sensorId: string) => void;
+  simulateFlow: (sensorId: string, value: number) => void;
+  togglePump: (sensorId: string) => void;
+  toggleValve: (sensorId: string) => void;
+  resetSimulation: () => void;
 }
 
 // ── Helpers ─────────────────────────────────────────────────────────
@@ -121,12 +134,14 @@ const DEFAULT_FLOOR: Floor = { id: 'floor-1', name: 'Floor 1' };
 
 // ── Store ───────────────────────────────────────────────────────────
 
-export const useAppStore = create<AppState>((set) => ({
-  floors: [DEFAULT_FLOOR],
-  rooms: [],
-  pipes: [],
-  sensors: [],
-  activeFloorId: DEFAULT_FLOOR.id,
+export const useAppStore = create<AppState>()(
+  persist(
+    (set) => ({
+      floors: [DEFAULT_FLOOR],
+      rooms: [],
+      pipes: [],
+      sensors: [],
+      activeFloorId: DEFAULT_FLOOR.id,
 
   canvasMode: 'select',
   selectedId: null,
@@ -240,6 +255,11 @@ export const useAppStore = create<AppState>((set) => ({
     const newSensor: Sensor = {
       id: generateId('sensor'),
       ...sensorArgs,
+      // Phase 7 Default State
+      isOn: sensorArgs.type === 'pump' ? true : undefined,
+      isOpen: sensorArgs.type === 'valve' ? true : undefined,
+      value: sensorArgs.type === 'master_flow' ? 0 : undefined,
+      isWet: sensorArgs.type === 'water_drop' || sensorArgs.type === 'humidity' ? false : undefined,
     };
     set((state) => ({
       sensors: [...state.sensors, newSensor],
@@ -272,4 +292,55 @@ export const useAppStore = create<AppState>((set) => ({
         return s;
       }),
     })),
-}));
+
+  // ── Phase 7 Simulation Logic ────────────────────────────────────
+
+  simulateLeak: (sensorId: string) => set((state) => {
+    const target = state.sensors.find((s) => s.id === sensorId);
+    if (!target) return state;
+
+    return {
+      sensors: state.sensors.map((s) => {
+        if (s.id === sensorId) return { ...s, isWet: true };
+        // Automated Mitigation: Shut off pumps and valves on the same floor
+        if (s.floorId === target.floorId) {
+          if (s.type === 'pump') return { ...s, isOn: false };
+          if (s.type === 'valve') return { ...s, isOpen: false };
+        }
+        return s;
+      })
+    };
+  }),
+
+  simulateFlow: (sensorId: string, value: number) => set((state) => ({
+    sensors: state.sensors.map((s) => s.id === sensorId ? { ...s, value } : s),
+  })),
+
+  togglePump: (sensorId: string) => set((state) => ({
+    sensors: state.sensors.map((s) => s.id === sensorId ? { ...s, isOn: !s.isOn } : s),
+  })),
+
+  toggleValve: (sensorId: string) => set((state) => ({
+    sensors: state.sensors.map((s) => s.id === sensorId ? { ...s, isOpen: !s.isOpen } : s),
+  })),
+
+  resetSimulation: () => set((state) => ({
+    sensors: state.sensors.map((s) => {
+      let overrides = {};
+      if (s.type === 'water_drop' || s.type === 'humidity') overrides = { isWet: false };
+      if (s.type === 'master_flow') overrides = { value: 0 };
+      if (s.type === 'pump') overrides = { isOn: true };
+      if (s.type === 'valve') overrides = { isOpen: true };
+      return { ...s, ...overrides };
+    })
+  })),
+}), { name: 'tms-storage' }));
+
+// Cross-tab synchronization
+if (typeof window !== 'undefined') {
+  window.addEventListener('storage', (e) => {
+    if (e.key === 'tms-storage') {
+      useAppStore.persist.rehydrate();
+    }
+  });
+}

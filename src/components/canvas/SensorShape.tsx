@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useRef, useEffect } from 'react';
 import { Group, Circle, Text, Path } from 'react-konva';
+import Konva from 'konva';
 import { useAppStore, type Sensor, type SensorType } from '@/store/useAppStore';
 import type { KonvaEventObject } from 'konva/lib/Node';
 import { getClosestPointOnPipes, findRoomForPoint } from '@/utils/geometry';
@@ -67,6 +68,42 @@ export default function SensorShape({ sensor, opacity = 1, onHoverIn, onHoverOut
 
   const isSelected = selectedId === sensor.id;
   const config = TYPE_CONFIG[sensor.type] || TYPE_CONFIG.master_flow;
+
+  // ── Phase 7 Reactions ─────────────────────────────────────────────
+  const isLeaking = sensor.type === 'water_drop' && sensor.isWet;
+  const isOff = sensor.type === 'pump' && sensor.isOn === false;
+  const isBlocked = sensor.type === 'valve' && sensor.isOpen === false;
+
+  let displayColor = config.color;
+  if (isOff) displayColor = '#94a3b8'; // Slate 400
+  if (isBlocked || isLeaking) displayColor = '#ef4444'; // Red 500
+
+  const circleRef = useRef<any>(null);
+
+  useEffect(() => {
+    if (!circleRef.current) return;
+    
+    if (!isLeaking) {
+      circleRef.current.scale({ x: 1, y: 1 });
+      circleRef.current.getLayer()?.batchDraw();
+      return;
+    }
+
+    const anim = new Konva.Animation((frame) => {
+      if (!frame) return;
+      const scale = 1 + Math.abs(Math.sin(frame.time * 0.005)) * 0.15;
+      circleRef.current.scale({ x: scale, y: scale });
+    }, circleRef.current.getLayer());
+
+    anim.start();
+    return () => {
+      anim.stop();
+      if (circleRef.current) {
+         circleRef.current.scale({ x: 1, y: 1 });
+         circleRef.current.getLayer()?.batchDraw();
+      }
+    };
+  }, [isLeaking]);
 
   // ── Handlers ──────────────────────────────────────────────────────
 
@@ -145,12 +182,12 @@ export default function SensorShape({ sensor, opacity = 1, onHoverIn, onHoverOut
         <Circle
           radius={26}
           fill="transparent"
-          stroke={sensor.isMaster ? '#f59e0b' : '#38bdf8'}
-          strokeWidth={sensor.isMaster ? 4 : 3}
-          opacity={sensor.isMaster ? 0.8 : 0.6}
-          shadowColor={sensor.isMaster ? '#f59e0b' : undefined}
-          shadowBlur={sensor.isMaster ? 15 : 0}
-          shadowOpacity={sensor.isMaster ? 0.6 : 0}
+          stroke={sensor.isMaster ? '#f59e0b' : (isLeaking ? '#ef4444' : '#38bdf8')}
+          strokeWidth={sensor.isMaster ? 4 : (isLeaking ? 5 : 3)}
+          opacity={sensor.isMaster ? 0.8 : (isLeaking ? 1 : 0.6)}
+          shadowColor={sensor.isMaster ? '#f59e0b' : (isLeaking ? '#ef4444' : undefined)}
+          shadowBlur={sensor.isMaster || isLeaking ? 15 : 0}
+          shadowOpacity={sensor.isMaster || isLeaking ? 0.6 : 0}
         />
       )}
       {/* Top Label (Type) */}
@@ -161,15 +198,16 @@ export default function SensorShape({ sensor, opacity = 1, onHoverIn, onHoverOut
         fontSize={10}
         fontStyle="bold"
         fontFamily="Inter, sans-serif"
-        fill="#64748b"
+        fill={isLeaking || isBlocked ? '#ef4444' : (isOff ? '#94a3b8' : '#64748b')}
         align="center"
         width={100}
         letterSpacing={0.5}
       />
 
       <Circle
+        ref={circleRef}
         radius={22}
-        fill={config.color}
+        fill={displayColor}
         stroke={isSelected ? '#1e293b' : '#ffffff'}
         strokeWidth={isSelected ? 3 : 2}
         shadowColor="rgba(0,0,0,0.1)"

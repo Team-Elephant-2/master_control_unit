@@ -268,13 +268,13 @@ export default function CanvasStage() {
       ? 'cursor-crosshair'
       : 'cursor-default';
 
-  const getMockHoverReading = (type: string) => {
-    switch(type) {
-      case 'master_flow': return 'Flow: 15.2 L/m';
-      case 'humidity': return 'Humidity: 42%';
-      case 'water_drop': return 'Status: DRY';
-      case 'pump': return 'Pump: ON';
-      case 'valve': return 'Gate: OPEN';
+  const getLiveHoverReading = (sensor: Sensor) => {
+    switch(sensor.type) {
+      case 'master_flow': return `Flow: ${sensor.value || 0} L/m`;
+      case 'humidity': return `Humidity: ${sensor.value || 42}%`;
+      case 'water_drop': return `Status: ${sensor.isWet ? 'LEAK DETECTED' : 'DRY'}`;
+      case 'pump': return `Pump: ${sensor.isOn ? 'ON' : 'OFF'}`;
+      case 'valve': return `Gate: ${sensor.isOpen ? 'OPEN' : 'BLOCKED'}`;
       default: return 'Online';
     }
   };
@@ -365,7 +365,7 @@ export default function CanvasStage() {
              <Cpu className="h-3.5 w-3.5 text-indigo-400" /> Node {hoveredSensor.sensor.hardwareId}
           </div>
           <div className="text-sm font-bold tracking-wide">
-             {getMockHoverReading(hoveredSensor.sensor.type)}
+             {getLiveHoverReading(hoveredSensor.sensor)}
           </div>
           <div className="absolute -bottom-1.5 left-1/2 h-3 w-3 -translate-x-1/2 rotate-45 border-b border-r border-slate-700 bg-slate-900/95" />
         </div>

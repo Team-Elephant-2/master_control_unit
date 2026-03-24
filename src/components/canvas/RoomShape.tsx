@@ -3,6 +3,7 @@ import { Line, Circle, Text, Group, Transformer } from 'react-konva';
 import { useAppStore } from '@/store/useAppStore';
 import type { Room } from '@/store/useAppStore';
 import type { KonvaEventObject } from 'konva/lib/Node';
+import Konva from 'konva';
 
 interface RoomShapeProps {
   room: Room;
@@ -22,8 +23,11 @@ export default function RoomShape({ room, opacity = 1 }: RoomShapeProps) {
   const renameRoom = useAppStore((s) => s.renameRoom);
   const allRooms = useAppStore((s) => s.rooms);
   const setFocusedRoomId = useAppStore((s) => s.setFocusedRoomId);
+  const sensors = useAppStore((s) => s.sensors);
 
   const isSelected = selectedId === room.id;
+  const isLeaking = sensors.some((s) => s.roomId === room.id && s.type === 'water_drop' && s.isWet);
+  
   const pts = room.polygonPoints;
 
   // ── Transformer attachment ────────────────────────────────────────
@@ -34,6 +38,36 @@ export default function RoomShape({ room, opacity = 1 }: RoomShapeProps) {
       trRef.current.getLayer()?.batchDraw();
     }
   }, [isSelected]);
+
+  // ── Leak Animation ────────────────────────────────────────────────
+
+  useEffect(() => {
+    if (!lineRef.current) return;
+    
+    if (!isLeaking) {
+      lineRef.current.fill(isSelected ? '#e0f2fe' : '#f0f9ff');
+      lineRef.current.stroke(isSelected ? '#38bdf8' : '#cbd5e1');
+      lineRef.current.getLayer()?.batchDraw();
+      return;
+    }
+
+    const anim = new Konva.Animation((frame) => {
+      if (!frame) return;
+      const alpha = 0.1 + Math.abs(Math.sin(frame.time * 0.003)) * 0.3;
+      lineRef.current.fill(`rgba(239, 68, 68, ${alpha})`);
+      lineRef.current.stroke('rgba(239, 68, 68, 0.8)');
+    }, lineRef.current.getLayer());
+
+    anim.start();
+    return () => {
+      anim.stop();
+      if (lineRef.current) {
+        lineRef.current.fill(isSelected ? '#e0f2fe' : '#f0f9ff');
+        lineRef.current.stroke(isSelected ? '#38bdf8' : '#cbd5e1');
+        lineRef.current.getLayer()?.batchDraw();
+      }
+    };
+  }, [isLeaking, isSelected]);
 
   // ── Helpers ──────────────────────────────────────────────────────
 
