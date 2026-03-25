@@ -110,6 +110,9 @@ interface AppState {
   togglePump: (sensorId: string) => void;
   toggleValve: (sensorId: string) => void;
   resetSimulation: () => void;
+
+  // Phase 8 Utilities
+  clearFloor: (floorId: string) => void;
 }
 
 // ── Helpers ─────────────────────────────────────────────────────────
@@ -333,6 +336,17 @@ export const useAppStore = create<AppState>()(
       if (s.type === 'valve') overrides = { isOpen: true };
       return { ...s, ...overrides };
     })
+  })),
+
+  // ── Phase 8 Utilities ───────────────────────────────────────────
+
+  clearFloor: (floorId: string) => set((state) => ({
+    rooms: state.rooms.filter(r => r.floorId !== floorId),
+    pipes: state.pipes.filter(p => p.floorId !== floorId),
+    sensors: state.sensors.filter(s => s.floorId !== floorId),
+    selectedId: null,
+    focusedRoomId: null,
+    canvasMode: 'select'
   })),
 }), { name: 'tms-storage' }));
 

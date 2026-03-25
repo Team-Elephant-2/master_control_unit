@@ -1,3 +1,5 @@
+'use client';
+
 import React, { useRef, useEffect, useMemo } from 'react';
 import { Line, Circle, Text, Group, Transformer } from 'react-konva';
 import { useAppStore } from '@/store/useAppStore';
@@ -101,13 +103,6 @@ export default function RoomShape({ room, opacity = 1 }: RoomShapeProps) {
 
   // ── Handlers ──────────────────────────────────────────────────────
 
-  const handleRename = () => {
-    const newName = window.prompt('Enter room name:', room.name);
-    if (newName && newName.trim()) {
-      renameRoom(room.id, newName.trim());
-    }
-  };
-
   const handleClick = (e: KonvaEventObject<MouseEvent>) => {
     if (canvasMode !== 'select') return;
     e.cancelBubble = true;
@@ -145,15 +140,11 @@ export default function RoomShape({ room, opacity = 1 }: RoomShapeProps) {
     }
 
     if (minLineDist < 20) {
-      // Logic for adding point
       if (isSelected && bestInsertIndex !== -1) {
         const newPts = [...pts];
         newPts.splice(bestInsertIndex * 2, 0, pos.x, pos.y);
         updateRoomPoints(room.id, newPts);
       }
-    } else {
-      // Far from border -> rename
-      handleRename();
     }
   };
 

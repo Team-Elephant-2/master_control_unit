@@ -105,6 +105,26 @@ export default function SensorShape({ sensor, opacity = 1, onHoverIn, onHoverOut
     };
   }, [isLeaking]);
 
+  const isShutoff = (sensor.type === 'pump' && !sensor.isOn) || (sensor.type === 'valve' && !sensor.isOpen);
+
+  const shutoffBadgeRef = useRef<any>(null);
+
+  useEffect(() => {
+    let anim: Konva.Animation;
+    if (isShutoff && shutoffBadgeRef.current) {
+      anim = new Konva.Animation((frame) => {
+        if (!frame) return;
+        const period = 800;
+        const scale = 1 + Math.abs(Math.sin((frame.time * 2 * Math.PI) / period)) * 0.15;
+        shutoffBadgeRef.current.radius(6 * scale);
+      }, shutoffBadgeRef.current.getLayer());
+      anim.start();
+    }
+    return () => {
+      if (anim) anim.stop();
+    };
+  }, [isShutoff]);
+
   // ── Handlers ──────────────────────────────────────────────────────
 
   const handleClick = (e: KonvaEventObject<MouseEvent>) => {
@@ -230,6 +250,30 @@ export default function SensorShape({ sensor, opacity = 1, onHoverIn, onHoverOut
         listening={false}
       />
       
+      {/* Shutoff Warning Badge overlaid on top right of the sensor node */}
+      {isShutoff && (
+        <Group x={16} y={-16}>
+          <Circle
+            ref={shutoffBadgeRef}
+            radius={6}
+            fill="#ef4444"
+            shadowColor="#ef4444"
+            shadowBlur={4}
+            shadowOpacity={0.8}
+          />
+          <Text
+            text="!"
+            fill="#ffffff"
+            fontSize={10}
+            fontStyle="bold"
+            align="center"
+            verticalAlign="middle"
+            offsetX={3}
+            offsetY={5}
+          />
+        </Group>
+      )}
+      
       {/* Bottom Label (ID) */}
       <Text
         text={`ID: ${sensor.hardwareId}`}
@@ -241,6 +285,22 @@ export default function SensorShape({ sensor, opacity = 1, onHoverIn, onHoverOut
         align="center"
         width={80}
       />
+
+      {/* Warning Text for Shutoff */}
+      {isShutoff && (
+        <Text
+          text="SHUTOFF ACTIVE"
+          x={-40}
+          y={42}
+          fontSize={9}
+          fontStyle="bold"
+          fontFamily="Inter, sans-serif"
+          fill="#ef4444"
+          align="center"
+          width={80}
+          letterSpacing={0.5}
+        />
+      )}
     </Group>
   );
 }

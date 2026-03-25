@@ -28,16 +28,16 @@ export default function TopBar() {
         <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-sky-50">
           <Droplets className="h-4.5 w-4.5 text-sky-600" />
         </div>
-        <span className="text-base font-semibold tracking-tight text-slate-900">
+        <span className="text-lg font-bold tracking-tight text-slate-900">
           Aqua Monitor
         </span>
       </div>
 
       {/* Global Floor Stats */}
-      <div className="flex items-center gap-5">
+      <div className="flex items-center gap-6">
         {/* Total Flow */}
-        <div className="flex items-center gap-2 text-sm text-slate-600">
-          <Activity className="h-4 w-4 text-slate-400" />
+        <div className="flex items-center gap-2 text-base text-slate-600">
+          <Activity className="h-5 w-5 text-slate-400" />
           <span className="font-medium text-slate-500">Floor Total Flow</span>
           <span className="font-semibold tabular-nums text-slate-900">
             {totalFlowDisplay} L/m
@@ -45,13 +45,13 @@ export default function TopBar() {
         </div>
 
         {/* Divider */}
-        <div className="h-5 w-px bg-slate-200" />
+        <div className="h-6 w-px bg-slate-200" />
 
         {/* System Status */}
-        <div className="flex items-center gap-2 text-sm">
+        <div className="flex items-center gap-2 text-base">
           <span className="font-medium text-slate-500">System Status</span>
           <span
-            className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold ${statusColor}`}
+            className={`inline-flex items-center rounded-full border px-3 py-0.5 text-sm font-semibold ${statusColor}`}
           >
             {systemStatus}
           </span>

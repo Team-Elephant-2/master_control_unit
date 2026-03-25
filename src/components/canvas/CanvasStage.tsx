@@ -1,3 +1,5 @@
+'use client';
+
 import React, { useRef, useState, useEffect, useCallback } from 'react';
 import { Stage, Layer, Circle, Group } from 'react-konva';
 import Konva from 'konva';
@@ -71,6 +73,19 @@ export default function CanvasStage() {
   const floorRooms = rooms.filter((r) => r.floorId === activeFloorId);
   const floorPipes = pipes.filter((p) => p.floorId === activeFloorId);
   const floorSensors = sensors.filter((s) => s.floorId === activeFloorId);
+
+  // Phase 9: Flow State logic
+  const isFlowing = React.useMemo(() => {
+    const hasPump = floorSensors.some(s => s.type === 'pump');
+    const pumpIsOn = hasPump 
+      ? floorSensors.some(s => s.type === 'pump' && s.isOn)
+      : true; // Default flow is true if no pump is configured
+
+    const allValvesOpen = floorSensors.filter(s => s.type === 'valve').every(s => s.isOpen);
+    const hasLeak = floorSensors.some(s => (s.type === 'water_drop' || s.type === 'humidity') && s.isWet);
+
+    return pumpIsOn && allValvesOpen && !hasLeak;
+  }, [floorSensors]);
 
   // ── Resize observer ─────────────────────────────────────────────
 
@@ -314,11 +329,7 @@ export default function CanvasStage() {
 
           {/* Rendered pipes (Middle layer) */}
           {floorPipes.map((pipe) => (
-            <PipeShape 
-               key={pipe.id} 
-               pipe={pipe} 
-               opacity={focusedRoomId ? 0.2 : 1} 
-            />
+            <PipeShape key={pipe.id} pipe={pipe} isFlowing={isFlowing} />
           ))}
 
           {/* In-progress drawing pipe (Top layer) */}
