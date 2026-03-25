@@ -8,17 +8,21 @@ export default function LeftSidebar() {
   const activeFloorId = useAppStore((s) => s.activeFloorId);
   const setActiveFloor = useAppStore((s) => s.setActiveFloor);
   const addFloor = useAppStore((s) => s.addFloor);
-  const clearFloor = useAppStore((s) => s.clearFloor);
+  const removeFloor = useAppStore((s) => s.removeFloor);
 
   const handleAddFloor = () => {
     const nextNum = floors.length + 1;
     addFloor(`Floor ${nextNum}`);
   };
 
-  const handleClearFloor = () => {
+  const handleDeleteFloor = () => {
     if (!activeFloorId) return;
-    if (window.confirm("Are you sure you want to permanently reset this entire floor layout? This cannot be undone.")) {
-      clearFloor(activeFloorId);
+    if (floors.length <= 1) {
+      alert("Cannot delete the only remaining floor. Add another floor first.");
+      return;
+    }
+    if (window.confirm("Are you sure you want to permanently delete this floor and all its contents? This cannot be undone.")) {
+      removeFloor(activeFloorId);
     }
   };
 
@@ -70,13 +74,13 @@ export default function LeftSidebar() {
           Add Floor
         </button>
 
-        {/* Clear Floor Button */}
+        {/* Delete Floor Button */}
         <button
-          onClick={handleClearFloor}
+          onClick={handleDeleteFloor}
           className="flex w-full items-center justify-center gap-2 rounded-lg border border-red-200 bg-red-50/50 px-3 py-2.5 text-sm font-medium text-red-600 transition-colors hover:bg-red-50 hover:border-red-300"
         >
           <Trash2 className="h-4 w-4" />
-          Reset Layout
+          Delete Floor
         </button>
       </div>
     </aside>

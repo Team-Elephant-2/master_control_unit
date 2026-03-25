@@ -78,6 +78,11 @@ interface AppState {
   // Phase 10: Tracing Mode
   tracingMode: boolean;
 
+  // Phase 11: Navigation
+  stageX: number;
+  stageY: number;
+  stageScale: number;
+
   // ── Actions ──────────────────────────────────────────────────────
   // Floors
   setActiveFloor: (id: string) => void;
@@ -92,6 +97,8 @@ interface AppState {
   setSelectedSensorType: (type: SensorType | null) => void;
   toggleTracingMode: () => void;
   deleteEntity: (id: string) => void;
+  setStagePosition: (x: number, y: number) => void;
+  setStageScale: (scale: number) => void;
 
   // Room actions
   addRoom: (floorId: string, x: number, y: number) => void;
@@ -158,6 +165,9 @@ export const useAppStore = create<AppState>()(
   drawingPipePoints: [],
   selectedSensorType: null,
   tracingMode: false,
+  stageX: 0,
+  stageY: 0,
+  stageScale: 1,
 
   // ── Floor actions ───────────────────────────────────────────────
 
@@ -167,13 +177,36 @@ export const useAppStore = create<AppState>()(
   },
 
   removeFloor: (id: string) =>
-    set((state) => ({
-      floors: state.floors.filter((f) => f.id !== id),
-      activeFloorId:
+    set((state) => {
+      const floorIndex = state.floors.findIndex((f) => f.id === id);
+      if (floorIndex === -1) return state;
+
+      const remainingFloors = state.floors.filter((f) => f.id !== id);
+      
+      // Phase 12: Renumber remaining floors so they are always in order
+      const renamedFloors = remainingFloors.map((f, i) => ({
+        ...f,
+        name: `Floor ${i + 1}`
+      }));
+
+      const nextActiveId =
         state.activeFloorId === id
-          ? state.floors[0]?.id ?? null
-          : state.activeFloorId,
-    })),
+          ? (renamedFloors[0]?.id ?? null)
+          : state.activeFloorId;
+
+      return {
+        floors: renamedFloors,
+        activeFloorId: nextActiveId,
+        rooms: state.rooms.filter((r) => r.floorId !== id),
+        pipes: state.pipes.filter((p) => p.floorId !== id),
+        sensors: state.sensors.filter((s) => s.floorId !== id),
+        selectedId: null,
+        focusedRoomId: null,
+        stageX: 0,
+        stageY: 0,
+        stageScale: 1
+      };
+    }),
 
   setActiveFloor: (id: string) => set({ activeFloorId: id }),
 
@@ -205,6 +238,11 @@ export const useAppStore = create<AppState>()(
   setSelectedSensorType: (type: SensorType | null) => set({ selectedSensorType: type, canvasMode: type ? 'add_sensor' : 'select' }),
 
   setFocusedRoomId: (id: string | null) => set({ focusedRoomId: id }),
+
+  // ── Phase 11 Navigation ─────────────────────────────────────────
+
+  setStagePosition: (x: number, y: number) => set({ stageX: x, stageY: y }),
+  setStageScale: (scale: number) => set({ stageScale: scale }),
 
   // ── Room actions ────────────────────────────────────────────────
 
@@ -354,14 +392,21 @@ export const useAppStore = create<AppState>()(
 
   // ── Phase 8 Utilities ───────────────────────────────────────────
 
-  clearFloor: (floorId: string) => set((state) => ({
-    rooms: state.rooms.filter(r => r.floorId !== floorId),
-    pipes: state.pipes.filter(p => p.floorId !== floorId),
-    sensors: state.sensors.filter(s => s.floorId !== floorId),
-    selectedId: null,
-    focusedRoomId: null,
-    canvasMode: 'select'
-  })),
+  clearFloor: (floorId: string) => {
+    console.log(`[useAppStore] Clearing floor: ${floorId}`);
+    set((state) => ({
+      rooms: state.rooms.filter(r => r.floorId !== floorId),
+      pipes: state.pipes.filter(p => p.floorId !== floorId),
+      sensors: state.sensors.filter(s => s.floorId !== floorId),
+      floors: state.floors.map(f => f.id === floorId ? { ...f, blueprintUrl: undefined } : f),
+      selectedId: null,
+      focusedRoomId: null,
+      canvasMode: 'select',
+      stageX: 0,
+      stageY: 0,
+      stageScale: 1
+    }));
+  },
 }), { name: 'tms-storage' }));
 
 // Cross-tab synchronization

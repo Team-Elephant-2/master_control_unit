@@ -82,6 +82,11 @@ export default function CanvasStage() {
   const setDrawingPipePoints = useAppStore((s) => s.setDrawingPipePoints);
   const deleteEntity = useAppStore((s) => s.deleteEntity);
   const setFocusedRoomId = useAppStore((s) => s.setFocusedRoomId);
+  const stageX = useAppStore((s) => s.stageX);
+  const stageY = useAppStore((s) => s.stageY);
+  const stageScale = useAppStore((s) => s.stageScale);
+  const setStagePosition = useAppStore((s) => s.setStagePosition);
+  const setStageScale = useAppStore((s) => s.setStageScale);
 
   // Filter entities for active floor
   const floors = useAppStore((s) => s.floors);
@@ -146,6 +151,13 @@ export default function CanvasStage() {
 
   // ── Click handler ───────────────────────────────────────────────
 
+  const getRelativePointerPosition = (stage: Konva.Stage) => {
+    const transform = stage.getAbsoluteTransform().copy();
+    transform.invert();
+    const pos = stage.getPointerPosition();
+    return pos ? transform.point(pos) : null;
+  };
+
   const handleStageClick = useCallback(
     (e: KonvaEventObject<MouseEvent>) => {
       if (!activeFloorId) return;
@@ -153,7 +165,7 @@ export default function CanvasStage() {
       const stage = e.target.getStage();
       if (!stage) return;
 
-      const pos = stage.getPointerPosition();
+      const pos = getRelativePointerPosition(stage);
       if (!pos) return;
 
       switch (canvasMode) {
@@ -265,19 +277,74 @@ export default function CanvasStage() {
       x: targetX,
       y: targetY,
       easing: Konva.Easings.EaseInOut,
+      onFinish: () => {
+        setStagePosition(targetX, targetY);
+        setStageScale(finalScale);
+      }
     }).play();
 
-  }, [focusedRoomId, dimensions, floorRooms]);
+  }, [focusedRoomId, dimensions, floorRooms, setStagePosition, setStageScale]);
 
   const handleResetView = () => {
     setSelectedId(null);
     setFocusedRoomId(null);
+    setStagePosition(0, 0);
+    setStageScale(1);
+  };
+
+  // ── Panning & Zooming Handlers ──────────────────────────────────
+
+  const handleWheel = (e: KonvaEventObject<WheelEvent>) => {
+    e.evt.preventDefault();
+    const stage = stageRef.current;
+    if (!stage) return;
+
+    const oldScale = stage.scaleX();
+    const pointer = stage.getPointerPosition();
+    if (!pointer) return;
+
+    const mousePointTo = {
+      x: (pointer.x - stage.x()) / oldScale,
+      y: (pointer.y - stage.y()) / oldScale,
+    };
+
+    const scaleBy = 1.1;
+    const newScale = e.evt.deltaY < 0 ? oldScale * scaleBy : oldScale / scaleBy;
+
+    // Limit scale
+    const finalScale = Math.max(0.1, Math.min(newScale, 5));
+
+    const newPos = {
+      x: pointer.x - mousePointTo.x * finalScale,
+      y: pointer.y - mousePointTo.y * finalScale,
+    };
+
+    setStageScale(finalScale);
+    setStagePosition(newPos.x, newPos.y);
+  };
+
+    // Update store during drag for reactive feedback
+  const handleDragMove = (e: KonvaEventObject<DragEvent>) => {
+    if (e.target === stageRef.current) {
+      setStagePosition(e.target.x(), e.target.y());
+    }
+  };
+
+  const handleDragEnd = (e: KonvaEventObject<DragEvent>) => {
+    if (e.target === stageRef.current) {
+      setStagePosition(e.target.x(), e.target.y());
+    }
   };
 
   // ── Double-click to finalize pipe ───────────────────────────────
 
   const handleStageDblClick = useCallback(
     (e: KonvaEventObject<MouseEvent>) => {
+      const stage = e.target.getStage();
+      if (!stage) return;
+      const pos = getRelativePointerPosition(stage);
+      if (!pos) return;
+
       if (canvasMode !== 'draw_pipe' || !activeFloorId) return;
 
       // Need at least 2 points (4 numbers) to make a pipe
@@ -341,11 +408,29 @@ export default function CanvasStage() {
         ref={stageRef}
         width={dimensions.width}
         height={dimensions.height}
+        x={stageX}
+        y={stageY}
+        scaleX={stageScale}
+        scaleY={stageScale}
+        draggable={canvasMode === 'select' && !focusedRoomId}
+        onWheel={handleWheel}
+        onDragMove={handleDragMove}
+        onDragEnd={handleDragEnd}
         onClick={handleStageClick}
         onTap={handleStageClick as any}
         onDblClick={handleStageDblClick}
         onDblTap={handleStageDblClick as any}
       >
+        {/* Background catch-all for dragging the stage */}
+        <Layer>
+           <Circle 
+              x={0} 
+              y={0} 
+              radius={10000} 
+              fill="transparent" 
+              listening={canvasMode === 'select'} 
+           />
+        </Layer>
         {/* Phase 10 Blueprint Background Layer */}
         <Layer>
           {activeFloor && activeFloor.blueprintUrl && (
