@@ -18,7 +18,9 @@ export default function TopBar() {
   // Determine system status
   const hasLeak = sensors.some((s) => s.type === 'water_drop' && s.isWet);
   const systemStatus = hasLeak ? 'ALERT' : 'OK';
-  const statusColor = hasLeak ? 'text-red-600 bg-red-50 border-red-200' : 'text-emerald-700 bg-emerald-50 border-emerald-200';
+  const statusColor = hasLeak 
+    ? 'text-red-700 bg-red-50 border-red-300 animate-pulse shadow-[0_0_10px_rgba(239,68,68,0.2)]' 
+    : 'text-emerald-700 bg-emerald-50 border-emerald-200';
 
   return (
     <>
