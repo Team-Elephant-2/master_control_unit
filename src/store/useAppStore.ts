@@ -19,6 +19,7 @@ export type SensorData =
 // ── Canvas Mode ─────────────────────────────────────────────────────
 
 export type CanvasMode = 'select' | 'add_room' | 'draw_pipe' | 'add_sensor';
+export type ViewMode = 'floor' | 'building_overview';
 
 // ── Entity Types ────────────────────────────────────────────────────
 
@@ -69,6 +70,7 @@ interface AppState {
   sensors: Sensor[];
   
   activeFloorId: string | null;
+  viewMode: ViewMode;
   canvasMode: CanvasMode;
   selectedId: string | null;
   focusedRoomId: string | null;
@@ -86,6 +88,7 @@ interface AppState {
   // ── Actions ──────────────────────────────────────────────────────
   // Floors
   setActiveFloor: (id: string) => void;
+  setViewMode: (mode: ViewMode) => void;
   addFloor: (name: string) => void;
   removeFloor: (id: string) => void;
   setFloorBlueprint: (floorId: string, url: string) => void;
@@ -158,6 +161,7 @@ export const useAppStore = create<AppState>()(
       pipes: [],
       sensors: [],
       activeFloorId: DEFAULT_FLOOR.id,
+      viewMode: 'floor',
 
   canvasMode: 'select',
   selectedId: null,
@@ -208,7 +212,9 @@ export const useAppStore = create<AppState>()(
       };
     }),
 
-  setActiveFloor: (id: string) => set({ activeFloorId: id }),
+  setActiveFloor: (id: string) => set({ activeFloorId: id, viewMode: 'floor' }),
+
+  setViewMode: (mode: ViewMode) => set({ viewMode: mode }),
 
   // ── Canvas actions ──────────────────────────────────────────────
 

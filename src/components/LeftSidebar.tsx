@@ -6,7 +6,9 @@ import { useAppStore } from '@/store/useAppStore';
 export default function LeftSidebar() {
   const floors = useAppStore((s) => s.floors);
   const activeFloorId = useAppStore((s) => s.activeFloorId);
+  const viewMode = useAppStore((s) => s.viewMode);
   const setActiveFloor = useAppStore((s) => s.setActiveFloor);
+  const setViewMode = useAppStore((s) => s.setViewMode);
   const addFloor = useAppStore((s) => s.addFloor);
   const removeFloor = useAppStore((s) => s.removeFloor);
 
@@ -28,6 +30,21 @@ export default function LeftSidebar() {
 
   return (
     <aside className="fixed left-0 top-14 bottom-0 z-40 flex w-56 flex-col border-r border-slate-200 bg-white shadow-sm">
+      {/* Building Summary Button */}
+      <div className="p-3 border-b border-slate-100">
+        <button
+          onClick={() => setViewMode('building_overview')}
+          className={`flex w-full items-center gap-3 rounded-xl px-4 py-3 text-sm font-bold transition-all ${
+            viewMode === 'building_overview'
+              ? 'bg-blue-600 text-white shadow-lg shadow-blue-200 ring-2 ring-blue-500 ring-offset-2'
+              : 'bg-slate-50 text-slate-600 border border-transparent hover:bg-slate-100'
+          }`}
+        >
+          <Layers className="h-4 w-4" />
+          Building Summary
+        </button>
+      </div>
+
       {/* Heading */}
       <div className="flex items-center gap-2 px-4 py-3.5 border-b border-slate-100 bg-slate-50/50">
         <Layers className="h-5 w-5 text-slate-400" />

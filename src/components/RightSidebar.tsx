@@ -35,6 +35,9 @@ export default function RightSidebar() {
   const setSelectedSensorType = useAppStore((s) => s.setSelectedSensorType);
   const focusedRoomId = useAppStore((s) => s.focusedRoomId);
   const activeFloorId = useAppStore((s) => s.activeFloorId);
+  const viewMode = useAppStore((s) => s.viewMode);
+
+  if (viewMode === 'building_overview') return null;
 
   // Find if a room or sensor is selected
   const selectedRoom = rooms.find((r) => r.id === selectedId);
