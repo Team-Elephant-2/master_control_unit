@@ -9,15 +9,13 @@ import {
   Activity,
   ArrowUpRight,
   TrendingDown,
-  Info,
-  Clock
+  Info 
 } from 'lucide-react';
 import { 
   AreaChart,
   Area,
   XAxis, 
   YAxis, 
-  CartesianGrid, 
   Tooltip, 
   ResponsiveContainer
 } from 'recharts';
@@ -34,7 +32,7 @@ export default function BuildingOverview() {
 
   const [hoveredFloorId, setHoveredFloorId] = useState<string | null>(null);
   const [lossAvoided, setLossAvoided] = useState(0);
-  const [isHoveringStack, setIsHoveringStack] = useState(false);
+  const [isHoveringBuilding, setIsHoveringBuilding] = useState(false);
 
   const hasGlobalLeak = sensors.some((s) => s.type === 'water_drop' && s.isWet);
 
@@ -51,160 +49,217 @@ export default function BuildingOverview() {
 
   const investment = (sensors.length * 150) + 500;
 
+  // 1. Stable Building Configuration
+  const stackSpacing = isHoveringBuilding ? 120 : 70;
+  const buildingHeight = (floors.length - 1) * stackSpacing;
+
   return (
-    <div className="h-full w-full bg-[#f8fafc] p-8 overflow-y-auto overflow-x-hidden">
-      {/* 1. ROI Cards Cleanup: Clean horizontal row at the very top */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
-        {/* Card 1: Investment */}
-        <div className="bg-white rounded-xl p-6 border border-slate-200 shadow-sm flex flex-col justify-between">
-          <div>
-            <p className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-2">Total Hardware Deployment</p>
-            <h3 className="text-3xl font-black text-slate-800 tracking-tighter italic">€{investment.toLocaleString()}</h3>
+    <div className="h-full w-full bg-[#f8fafc] p-8 overflow-y-auto overflow-x-hidden relative">
+      {/* 1. High-Contrast ROI Metric Grid (Strictly 2D) */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12 relative z-50">
+        <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm">
+          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 font-bold">Total Hardware Deployment</p>
+          <div className="flex items-baseline gap-2">
+            <span className="text-3xl font-black text-slate-800 tracking-tighter italic">€{investment.toLocaleString()}</span>
           </div>
-          <p className="text-[11px] font-bold text-slate-500 mt-4 flex items-center gap-1.5 opacity-60">
-            <Info className="h-3 w-3" />
-            Infrastructure overhead included
+          <p className="mt-4 flex items-center gap-2 text-[10px] font-bold text-slate-400">
+            <Info className="h-3.5 w-3.5" />
+            Infrastructure coverage active
           </p>
         </div>
 
-        {/* Card 2: Loss Avoided */}
-        <div className={`rounded-xl p-6 border transition-all duration-500 shadow-sm flex flex-col justify-between ${hasGlobalLeak ? 'bg-orange-100 border-orange-300 ring-4 ring-orange-100/50' : 'bg-red-50/40 border-slate-100'}`}>
-          <div>
-            <p className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-2">Potential Loss Avoided</p>
-            <h3 className={`text-3xl font-black tracking-tighter italic ${hasGlobalLeak ? 'text-orange-700' : 'text-slate-300 uppercase'}`}>
-              {hasGlobalLeak ? `€${lossAvoided.toFixed(2)}` : 'ACTIVE PROTECTION'}
-            </h3>
+        <div className={`rounded-2xl p-6 border shadow-sm transition-all duration-500 ${hasGlobalLeak ? 'bg-orange-50 border-orange-200' : 'bg-white border-slate-200'}`}>
+          <p className={`text-[10px] font-black uppercase tracking-widest mb-2 font-bold ${hasGlobalLeak ? 'text-orange-600' : 'text-slate-400'}`}>Potential Loss Avoided</p>
+          <div className="flex items-baseline gap-2">
+            <span className={`text-3xl font-black tracking-tighter italic ${hasGlobalLeak ? 'text-orange-600 animate-pulse' : 'text-slate-800'}`}>
+              {hasGlobalLeak ? `€${lossAvoided.toFixed(2)}` : '€0.00'}
+            </span>
           </div>
-          <p className={`text-[11px] font-bold mt-4 flex items-center gap-1.5 ${hasGlobalLeak ? 'text-orange-800 font-black' : 'text-slate-400'}`}>
-            <TrendingDown className="h-3 w-3" />
-            {hasGlobalLeak ? 'Increasing by €2 every 5s' : 'Instant mitigation sensor active'}
-          </p>
+          <div className={`mt-4 flex items-center gap-2 text-[10px] font-bold ${hasGlobalLeak ? 'text-orange-600' : 'text-slate-400'}`}>
+             <TrendingDown className="h-4 w-4" />
+             {hasGlobalLeak ? 'Automated Shutoff Active' : 'Real-time mitigation sensor'}
+          </div>
         </div>
 
-        {/* Card 3: ROI Efficiency */}
-        <div className="bg-white rounded-xl p-6 border border-slate-200 shadow-sm flex flex-col justify-between">
-          <div>
-            <p className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-2">Annual Projected ROI</p>
-            <h3 className="text-3xl font-black text-slate-800 tracking-tighter italic text-emerald-600">145%</h3>
+        <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm">
+           <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 font-bold">Annual Projected ROI</p>
+           <div className="flex items-baseline gap-2">
+            <span className="text-3xl font-black text-emerald-600 tracking-tighter italic">145%</span>
           </div>
-          <p className="text-[11px] font-bold text-emerald-600/80 mt-4 flex items-center gap-1.5">
-            <ShieldCheck className="h-3 w-3" />
-            8-month payback period
+          <p className="mt-4 flex items-center gap-2 text-[10px] font-bold text-emerald-600">
+             <ShieldCheck className="h-3.5 w-3.5" />
+             8-month payback period
           </p>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
-        {/* 2. Building Blueprint (Architectural Model) */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-start h-[700px]">
+        {/* 2. Prism Container: 3D Isometric Building Model */}
         <div 
-          className="relative h-[700px] bg-white rounded-2xl border border-slate-200 shadow-sm p-10 overflow-visible flex items-center justify-center group"
-          onMouseEnter={() => setIsHoveringStack(true)}
-          onMouseLeave={() => {
-            setIsHoveringStack(false);
-            setHoveredFloorId(null);
-          }}
+          className="relative h-full flex items-center justify-center p-20"
+          style={{ perspective: '1200px', overflow: 'visible' }}
+          onMouseEnter={() => setIsHoveringBuilding(true)}
+          onMouseLeave={() => setIsHoveringBuilding(false)}
         >
-          {/* Section Heading */}
-          <div className="absolute top-10 left-10">
-             <div className="flex items-center gap-2 mb-1.5">
-                <div className="h-2 w-2 rounded-full bg-blue-500 shadow-sm" />
-                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Architectural Visualization</span>
+          {/* Header */}
+          <div className="absolute top-0 left-0">
+             <div className="flex items-center gap-2 mb-1.5 opacity-50">
+                <div className={`h-2 w-2 rounded-full ${hasGlobalLeak ? 'bg-red-500 animate-ping' : 'bg-blue-600'}`} />
+                <span className="text-[10px] font-black uppercase tracking-widest">Architectural Simulation</span>
              </div>
-             <h2 className="text-2xl font-black text-slate-800 tracking-tighter italic uppercase">Building Blueprint</h2>
+             <h2 className="text-2xl font-black text-slate-800 tracking-tighter italic uppercase">Building Structure</h2>
           </div>
 
-            {/* Isometric Perspective Stack */}
+          {/* Stable 3D Stack Container (The Prism Foundation) */}
+          <div 
+            className="relative transition-all duration-1000 ease-in-out"
+            style={{ 
+              transformStyle: 'preserve-3d', 
+              transform: 'rotateX(60deg) rotateZ(-30deg)',
+              width: 320,
+              height: 200
+            }}
+          >
+            {/* 3. The Stable Building Envelope: Prism Shell */}
             <div 
-              className="relative transition-transform duration-700 flex flex-col items-center justify-center"
-              style={{ 
-                transformStyle: 'preserve-3d',
-                transform: 'rotateX(55deg) rotateZ(-45deg)',
-              }}
+              className="absolute inset-0 pointer-events-none"
+              style={{ transformStyle: 'preserve-3d' }}
             >
-              
-              {/* The "Skeleton" outer shell lines - connecting the corners of all floors */}
-              <div className="absolute inset-0 z-0 pointer-events-none" style={{ transformStyle: 'preserve-3d' }}>
-                 {/* 4 Corner vertical lines */}
-                 {[
-                   { left: '0px', top: '0px' },
-                   { left: '288px', top: '0px' },
-                   { left: '0px', top: '176px' },
-                   { left: '288px', top: '176px' }
-                 ].map((pos, i) => {
-                   const totalHeight = (floors.length - 1) * (isHoveringStack ? 100 : 60);
-                   return (
-                     <div 
-                      key={i}
-                      className="absolute bg-slate-200/60 w-[1px] transition-all duration-700" 
-                      style={{ 
-                        left: pos.left, 
-                        top: pos.top, 
-                        height: `${totalHeight}px`,
-                        transform: `translateZ(0px) rotateX(-90deg)`,
-                        transformOrigin: 'bottom'
-                      }} 
-                     />
-                   );
-                 })}
-              </div>
+               {/* 4. Glass Faces (Full Prism: 4 Walls) */}
+               {/* Wall 1: Front-Right Facade (Along Y=200) */}
+               <div 
+                className="absolute transition-all duration-1000"
+                style={{
+                  width: 320,
+                  height: buildingHeight,
+                  top: 200,
+                  left: 0,
+                  transform: 'rotateX(90deg)',
+                  transformOrigin: 'top',
+                  background: 'linear-gradient(to bottom, rgba(226, 232, 240, 0.35), rgba(59, 130, 246, 0.5))',
+                  borderLeft: '2px solid rgba(96, 165, 250, 0.8)',
+                  borderRight: '2px solid rgba(96, 165, 250, 0.8)',
+                  backdropFilter: 'blur(3px)'
+                }}
+               />
+               
+               {/* Wall 2: Front-Left Facade (Along X=320) */}
+               <div 
+                className="absolute transition-all duration-1000"
+                style={{
+                  width: buildingHeight,
+                  height: 200,
+                  top: 0,
+                  left: 320,
+                  transform: 'rotateY(-90deg)',
+                  transformOrigin: 'left',
+                  background: 'linear-gradient(to bottom, rgba(226, 232, 240, 0.35), rgba(59, 130, 246, 0.5))',
+                  borderLeft: '2px solid rgba(96, 165, 250, 0.8)',
+                  borderBottom: '2px solid rgba(96, 165, 250, 0.8)',
+                  backdropFilter: 'blur(3px)'
+                }}
+               />
 
-              {floors.map((floor, index) => {
-                const floorSensors = sensors.filter(s => s.floorId === floor.id);
-                const hasLeak = floorSensors.some(s => s.isWet);
-                const isHovered = hoveredFloorId === floor.id;
-                
-                const zOffset = index * (isHoveringStack ? 100 : 60);
+               {/* Wall 3: Back-Left Facade (Along Y=0) */}
+               <div 
+                className="absolute transition-all duration-1000"
+                style={{
+                  width: 320,
+                  height: buildingHeight,
+                  top: 0,
+                  left: 0,
+                  transform: 'rotateX(90deg)',
+                  transformOrigin: 'top',
+                  background: 'linear-gradient(to bottom, rgba(226, 232, 240, 0.2), rgba(59, 130, 246, 0.25))',
+                  borderLeft: '1.5px solid rgba(96, 165, 250, 0.6)',
+                  borderRight: '1.5px solid rgba(96, 165, 250, 0.6)'
+                }}
+               />
 
-                return (
-                  <div 
-                    key={floor.id}
-                    onMouseEnter={() => setHoveredFloorId(floor.id)}
-                    onClick={() => setActiveFloor(floor.id)}
-                    className={`
-                      absolute w-72 h-44 rounded transition-all duration-700 cursor-pointer border
-                      flex flex-col items-center justify-center
-                      ${hasLeak 
-                        ? 'bg-red-50/95 border-red-500 shadow-[0_0_40px_rgba(239,68,68,0.25)] animate-pulse' 
-                        : 'bg-white/95 border-slate-200 shadow-xl'}
-                      ${hoveredFloorId && !isHovered ? 'opacity-40 grayscale-[0.2]' : 'opacity-100'}
-                    `}
-                    style={{ 
-                      // 1. Stable Vertical Stack using translateZ
-                      transform: `translateZ(${zOffset}px)`,
-                      zIndex: index,
-                      transformStyle: 'preserve-3d'
-                    }}
-                  >
-                  {/* 3. Architectural HUD: External Leader Lines */}
-                  {/* Diagonal line coming off the side */}
-                  <div 
-                    className={`absolute left-full top-1/2 w-16 h-px bg-slate-300 transition-opacity duration-300 ${isHoveringStack ? 'opacity-100' : 'opacity-0'}`}
-                    style={{ transform: 'rotate(-25deg)', transformOrigin: 'left' }}
-                  />
-                  {/* External HUD Label */}
-                  <div 
-                    className={`absolute left-[calc(100%+60px)] top-[calc(50%-15px)] transition-all duration-300 whitespace-nowrap ${isHoveringStack ? 'opacity-100' : 'opacity-0'}`}
-                  >
-                    <div className="flex items-center gap-2">
-                      <span className="text-[10px] font-black text-slate-400">L-{String(index+1).padStart(2, '0')}:</span>
-                      <span className={`text-[10px] font-black uppercase tracking-widest ${hasLeak ? 'text-red-500' : 'text-emerald-500'}`}>
-                        {hasLeak ? 'LEAK DETECTED' : 'OK'}
-                      </span>
-                    </div>
-                    {isHovered && (
-                      <div className="flex items-center gap-3 mt-1.5 border-t border-slate-100 pt-1.5 animate-in fade-in slide-in-from-left-2">
-                        <span className="text-[9px] font-bold text-slate-400 uppercase">{floorSensors.length} NODES</span>
-                        <div className="h-1 w-1 rounded-full bg-slate-300" />
-                        <span className="text-[9px] font-bold text-slate-400 uppercase italic">PLAN INSPECT</span>
-                      </div>
-                    )}
-                  </div>
+               {/* Wall 4: Back-Right Facade (Along X=0) */}
+               <div 
+                className="absolute transition-all duration-1000"
+                style={{
+                  width: buildingHeight,
+                  height: 200,
+                  top: 0,
+                  left: 0,
+                  transform: 'rotateY(-90deg)',
+                  transformOrigin: 'left',
+                  background: 'linear-gradient(to bottom, rgba(226, 232, 240, 0.2), rgba(59, 130, 246, 0.25))',
+                  borderLeft: '1.5px solid rgba(96, 165, 250, 0.6)',
+                  borderBottom: '1.5px solid rgba(96, 165, 250, 0.6)'
+                }}
+               />
 
-                  {/* Internal Card content */}
-                  <div className="text-center p-4">
+               {/* 5. The Corner "Pillar" (Crucial Structural Anchor) */}
+               <div 
+                className="absolute transition-all duration-1000 bg-blue-500/80 w-[3px]"
+                style={{
+                   height: buildingHeight,
+                   left: 320,
+                   top: 200,
+                   transform: 'rotateX(90deg)',
+                   transformOrigin: 'top'
+                }}
+               />
+
+               {/* 6. Glass Top Cap (Prism Roof) */}
+               <div 
+                className="absolute inset-0 transition-all duration-1000"
+                style={{
+                   transform: `translateZ(${buildingHeight}px)`,
+                   border: '2px solid rgba(96, 165, 250, 0.8)',
+                   background: 'rgba(255, 255, 255, 0.3)',
+                   backdropFilter: 'blur(3px)'
+                }}
+               />
+            </div>
+
+            {/* Stable Floor Plates (Internal Data) */}
+            {floors.map((floor, index) => {
+              const floorSensors = sensors.filter(s => s.floorId === floor.id);
+              const hasLeak = floorSensors.some(s => s.isWet);
+              const isHovered = hoveredFloorId === floor.id;
+              const zOffset = index * stackSpacing;
+
+              return (
+                <div 
+                  key={floor.id}
+                  onMouseEnter={() => setHoveredFloorId(floor.id)}
+                  onMouseLeave={() => setHoveredFloorId(null)}
+                  onClick={() => setActiveFloor(floor.id)}
+                  className={`
+                    absolute inset-0 transition-all duration-1000 cursor-pointer border
+                    flex flex-col items-center justify-center
+                    ${hasLeak 
+                      ? 'bg-red-300/80 border-red-500 shadow-[0_0_60px_rgba(239,68,68,0.4)] !opacity-100' 
+                      : 'bg-white/95 border-slate-200 shadow-xl backdrop-blur-sm'}
+                    ${isHoveringBuilding && !isHovered && !hasLeak ? 'opacity-30 grayscale scale-95' : 'opacity-100'}
+                  `}
+                  style={{ 
+                    transformStyle: 'preserve-3d',
+                    transform: `translateZ(${zOffset}px)`,
+                  }}
+                >
+                  <div className="p-4 text-center pointer-events-none">
+                    <span className="text-[9px] font-black text-slate-400 block mb-1 uppercase tracking-[0.2em]">Floor {index+1}</span>
                     <h4 className={`text-xl font-black tracking-tighter uppercase ${hasLeak ? 'text-red-700' : 'text-slate-800'}`}>
                       {floor.name}
                     </h4>
+                  </div>
+
+                  {/* Leader Labels (outside) */}
+                  <div 
+                    className={`absolute left-full top-1/2 w-[200px] h-px bg-slate-200 transition-all duration-500 origin-left ${isHoveringBuilding ? 'opacity-100 translate-x-4' : 'opacity-0'}`}
+                    style={{ transform: 'rotate(-20deg) rotateX(-60deg) rotateY(30deg)' }}
+                  >
+                     <div className="absolute right-0 top-0 -translate-y-1/2 flex items-center gap-2">
+                        <div className={`h-2.5 w-2.5 rounded-full ${hasLeak ? 'bg-red-500 animate-pulse' : 'bg-emerald-500'}`} />
+                        <span className="text-[10px] font-black text-slate-500 whitespace-nowrap uppercase tracking-widest italic">
+                           {floor.name}: {hasLeak ? 'FAIL' : 'OK'}
+                        </span>
+                     </div>
                   </div>
                 </div>
               );
@@ -212,66 +267,54 @@ export default function BuildingOverview() {
           </div>
         </div>
 
-        {/* Global Stats Chart */}
-        <div className="bg-white rounded-2xl p-8 border border-slate-200 shadow-sm h-[700px] flex flex-col">
-          <div className="flex items-center justify-between mb-8">
-            <div>
-              <div className="flex items-center gap-2 text-indigo-500 mb-1">
-                <Clock className="h-4 w-4" />
-                <span className="text-[10px] font-black uppercase tracking-widest">History Buffer</span>
-              </div>
-              <h2 className="text-lg font-black text-slate-800 uppercase italic tracking-tighter">Consumption Matrix</h2>
-            </div>
-            <div className={`px-4 py-2 rounded-xl text-xs font-black ring-1 ${hasGlobalLeak ? 'bg-red-50 text-red-600 ring-red-200 animate-pulse' : 'bg-slate-50 text-slate-500 ring-slate-100'}`}>
-               SYSTEM: {hasGlobalLeak ? 'EMERGENCY SHUTOFF' : 'OPTIMIZED'}
-            </div>
-          </div>
-
-          <div className="flex-1 min-h-0 relative">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={MOCK_USAGE_DATA}>
-                <defs>
-                   <linearGradient id="colorUsage" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor={hasGlobalLeak ? '#ef4444' : '#6366f1'} stopOpacity={0.2}/>
-                    <stop offset="95%" stopColor={hasGlobalLeak ? '#ef4444' : '#6366f1'} stopOpacity={0}/>
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                <XAxis dataKey="time" hide />
-                <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#94a3b8' }} />
-                <Tooltip 
-                   contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)', fontWeight: 'bold' }}
-                />
-                <Area 
-                  type="monotone" 
-                  dataKey="usage" 
-                  stroke={hasGlobalLeak ? '#ef4444' : '#6366f1'} 
-                  strokeWidth={4} 
-                  fill="url(#colorUsage)"
-                  animationDuration={1500}
-                />
-              </AreaChart>
-            </ResponsiveContainer>
-          </div>
-
-          <div className="mt-8 grid grid-cols-2 gap-4">
-             <div className="bg-slate-50/50 rounded-xl p-4 border border-slate-100 flex items-center gap-3">
-                <div className="h-10 w-10 rounded-lg bg-indigo-50 flex items-center justify-center text-indigo-600">
-                   <Activity className="h-5 w-5" />
+        {/* System Telemetry Chart */}
+        <div className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm flex flex-col h-full relative overflow-hidden">
+          <div className="flex justify-between items-start mb-10 relative z-10">
+             <div>
+                <div className="flex items-center gap-2 text-indigo-500 mb-1.5">
+                  <Activity className="h-4 w-4" />
+                  <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Telemetry Feed</span>
                 </div>
-                <div>
-                  <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Avg Pulse</p>
-                  <p className="text-sm font-black text-slate-800">18.2 L/m</p>
-                </div>
+                <h2 className="text-xl font-black tracking-tighter italic uppercase text-slate-800">Consumption Matrix</h2>
              </div>
-             <div className="bg-slate-50/50 rounded-xl p-4 border border-slate-100 flex items-center gap-3">
-                <div className="h-10 w-10 rounded-lg bg-emerald-50 flex items-center justify-center text-emerald-600">
-                   <ArrowUpRight className="h-5 w-5" />
-                </div>
-                <div>
-                  <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Growth</p>
-                  <p className="text-sm font-black text-slate-800">+2.4% MoM</p>
-                </div>
+             <div className="bg-slate-50 border border-slate-100 px-4 py-2 rounded-xl text-right">
+                <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Building Integrity</p>
+                <p className={`text-sm font-black italic ${hasGlobalLeak ? 'text-red-600 animate-pulse' : 'text-emerald-500'}`}>
+                   {hasGlobalLeak ? 'ALERT' : 'OPTIMIZED'}
+                </p>
+             </div>
+          </div>
+
+          <div className="flex-1 min-h-0 relative z-10">
+             <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={MOCK_USAGE_DATA}>
+                  <defs>
+                    <linearGradient id="usageGrad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor={hasGlobalLeak ? '#ef4444' : '#6366f1'} stopOpacity={0.2}/>
+                      <stop offset="95%" stopColor={hasGlobalLeak ? '#ef4444' : '#6366f1'} stopOpacity={0}/>
+                    </linearGradient>
+                  </defs>
+                  <XAxis dataKey="time" hide />
+                  <YAxis hide domain={['dataMin - 5', 'dataMax + 5']} />
+                  <Area 
+                    type="monotone" 
+                    dataKey="usage" 
+                    stroke={hasGlobalLeak ? '#ef4444' : '#6366f1'} 
+                    strokeWidth={4} 
+                    fill="url(#usageGrad)"
+                    animationDuration={1500}
+                  />
+                </AreaChart>
+             </ResponsiveContainer>
+          </div>
+          
+          <div className="mt-8 grid grid-cols-2 gap-4 relative z-10">
+             <div className="bg-slate-50 rounded-2xl p-4 border border-slate-100">
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 font-bold">Health Status</p>
+                <p className="text-sm font-black text-slate-700 italic uppercase">Operational</p>
+             </div>
+             <div className="bg-slate-50 rounded-2xl p-4 border border-slate-100 flex items-center justify-center">
+                <ShieldCheck className={`h-8 w-8 ${hasGlobalLeak ? 'text-red-400' : 'text-emerald-500 opacity-30'}`} />
              </div>
           </div>
         </div>
