@@ -13,13 +13,13 @@ interface PipeShapeProps {
   isFlowing: boolean;
 }
 
-export default function PipeShape({ pipe, opacity = 1, isFlowing }: PipeShapeProps) {
-  const canvasMode = useAppStore((s) => s.canvasMode);
-  const selectedId = useAppStore((s) => s.selectedId);
+export default function PipeShape({ pipe, isFlowing, opacity = 1 }: PipeShapeProps) {
+  const isSelected = useAppStore((s) => s.selectedId === pipe.id);
   const setSelectedId = useAppStore((s) => s.setSelectedId);
+  const canvasMode = useAppStore((s) => s.canvasMode);
+  const tracingMode = useAppStore((s) => s.tracingMode);
   const updatePipePoints = useAppStore((s) => s.updatePipePoints);
 
-  const isSelected = selectedId === pipe.id;
   const pts = pipe.points;
 
   // Compute total length
@@ -146,7 +146,7 @@ export default function PipeShape({ pipe, opacity = 1, isFlowing }: PipeShapePro
       <Line
         points={pts}
         stroke="#e2e8f0"
-        strokeWidth={4}
+        strokeWidth={tracingMode ? 2 : 4}
         lineCap="round"
         lineJoin="round"
         hitStrokeWidth={15}
@@ -159,7 +159,7 @@ export default function PipeShape({ pipe, opacity = 1, isFlowing }: PipeShapePro
         ref={fgRef as any}
         points={pts}
         stroke="#3b82f6"
-        strokeWidth={4}
+        strokeWidth={tracingMode ? 2 : 4}
         lineCap="round"
         lineJoin="round"
         dash={[length, length]}

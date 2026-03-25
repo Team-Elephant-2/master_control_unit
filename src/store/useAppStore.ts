@@ -25,6 +25,7 @@ export type CanvasMode = 'select' | 'add_room' | 'draw_pipe' | 'add_sensor';
 export interface Floor {
   id: string;
   name: string;
+  blueprintUrl?: string; // Phase 10: Blueprint Background Image DataURL
 }
 
 export interface Room {
@@ -61,31 +62,36 @@ export interface Sensor {
 // ── Store Shape ─────────────────────────────────────────────────────
 
 interface AppState {
-  // Data
+  // ── State ────────────────────────────────────────────────────────
   floors: Floor[];
   rooms: Room[];
   pipes: Pipe[];
   sensors: Sensor[];
+  
   activeFloorId: string | null;
-
-  // Canvas state
   canvasMode: CanvasMode;
   selectedId: string | null;
-  drawingPipePoints: number[];
-  selectedSensorType: SensorType;
   focusedRoomId: string | null;
+  drawingPipePoints: number[];
+  selectedSensorType: SensorType | null;
 
-  // Floor actions
+  // Phase 10: Tracing Mode
+  tracingMode: boolean;
+
+  // ── Actions ──────────────────────────────────────────────────────
+  // Floors
+  setActiveFloor: (id: string) => void;
   addFloor: (name: string) => void;
   removeFloor: (id: string) => void;
-  setActiveFloor: (id: string) => void;
+  setFloorBlueprint: (floorId: string, url: string) => void;
 
-  // Canvas actions
+  // Mode
   setCanvasMode: (mode: CanvasMode) => void;
   setSelectedId: (id: string | null) => void;
-  deleteEntity: (id: string) => void;
-  setSelectedSensorType: (type: SensorType) => void;
   setFocusedRoomId: (id: string | null) => void;
+  setSelectedSensorType: (type: SensorType | null) => void;
+  toggleTracingMode: () => void;
+  deleteEntity: (id: string) => void;
 
   // Room actions
   addRoom: (floorId: string, x: number, y: number) => void;
@@ -148,9 +154,10 @@ export const useAppStore = create<AppState>()(
 
   canvasMode: 'select',
   selectedId: null,
-  drawingPipePoints: [],
-  selectedSensorType: 'master_flow',
   focusedRoomId: null,
+  drawingPipePoints: [],
+  selectedSensorType: null,
+  tracingMode: false,
 
   // ── Floor actions ───────────────────────────────────────────────
 
@@ -187,16 +194,15 @@ export const useAppStore = create<AppState>()(
 
   setSelectedId: (id: string | null) => set({ selectedId: id }),
 
-  deleteEntity: (id: string) =>
-    set((state) => ({
-      rooms: state.rooms.filter((r) => r.id !== id),
-      pipes: state.pipes.filter((p) => p.id !== id),
-      sensors: state.sensors.filter((s) => s.id !== id),
-      selectedId: state.selectedId === id ? null : state.selectedId,
-      focusedRoomId: state.focusedRoomId === id ? null : state.focusedRoomId,
-    })),
+  deleteEntity: (id: string) => set((state) => ({
+    rooms: state.rooms.filter((r) => r.id !== id),
+    pipes: state.pipes.filter((p) => p.id !== id),
+    sensors: state.sensors.filter((s) => s.id !== id),
+    selectedId: state.selectedId === id ? null : state.selectedId,
+    focusedRoomId: state.focusedRoomId === id ? null : state.focusedRoomId,
+  })),
 
-  setSelectedSensorType: (type: SensorType) => set({ selectedSensorType: type }),
+  setSelectedSensorType: (type: SensorType | null) => set({ selectedSensorType: type, canvasMode: type ? 'add_sensor' : 'select' }),
 
   setFocusedRoomId: (id: string | null) => set({ focusedRoomId: id }),
 
@@ -337,6 +343,14 @@ export const useAppStore = create<AppState>()(
       return { ...s, ...overrides };
     })
   })),
+
+  // ── Phase 10 Blueprint Tracing ──────────────────────────────────
+
+  setFloorBlueprint: (floorId: string, url: string) => set((state) => ({
+    floors: state.floors.map(f => f.id === floorId ? { ...f, blueprintUrl: url } : f)
+  })),
+
+  toggleTracingMode: () => set((state) => ({ tracingMode: !state.tracingMode })),
 
   // ── Phase 8 Utilities ───────────────────────────────────────────
 

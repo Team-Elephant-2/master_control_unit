@@ -1,16 +1,30 @@
 'use client';
 
 import React, { useRef, useState, useEffect, useCallback } from 'react';
-import { Stage, Layer, Circle, Group } from 'react-konva';
+import { Stage, Layer, Circle, Group, Image as KonvaImage } from 'react-konva';
 import Konva from 'konva';
-import { useAppStore, type Sensor } from '@/store/useAppStore';
+import { useAppStore, type Sensor, type SensorType } from '@/store/useAppStore';
 import RoomShape from './RoomShape';
 import PipeShape from './PipeShape';
 import DrawingPipe from './DrawingPipe';
 import SensorShape from './SensorShape';
+
+// Phase 10 Custom Hook/Component to load base64 Data URLs into Konva Image nodes
+function BlueprintImage({ url }: { url: string }) {
+  const [image, setImage] = React.useState<HTMLImageElement | null>(null);
+  React.useEffect(() => {
+    const img = new window.Image();
+    img.src = url;
+    img.onload = () => setImage(img);
+  }, [url]);
+
+  if (!image) return null;
+  return <KonvaImage image={image} x={0} y={0} opacity={0.5} listening={false} />;
+}
+
 import type { KonvaEventObject } from 'konva/lib/Node';
 import { getClosestPointOnPipes, findRoomForPoint } from '@/utils/geometry';
-import { Cpu, Maximize, Activity, Thermometer, Droplets, Zap, DoorClosed } from 'lucide-react';
+import { Cpu, Maximize, Activity, Thermometer, Droplets, Zap, DoorClosed, Upload } from 'lucide-react';
 
 // ── Grid dot rendering ──────────────────────────────────────────────
 
@@ -70,6 +84,9 @@ export default function CanvasStage() {
   const setFocusedRoomId = useAppStore((s) => s.setFocusedRoomId);
 
   // Filter entities for active floor
+  const floors = useAppStore((s) => s.floors);
+  const activeFloor = floors.find((f) => f.id === activeFloorId);
+  
   const floorRooms = rooms.filter((r) => r.floorId === activeFloorId);
   const floorPipes = pipes.filter((p) => p.floorId === activeFloorId);
   const floorSensors = sensors.filter((s) => s.floorId === activeFloorId);
@@ -164,7 +181,7 @@ export default function CanvasStage() {
 
           useAppStore.getState().addSensor({
             hardwareId: defaultHardwareId,
-            type: selectedType,
+            type: selectedType as SensorType,
             floorId: activeFloorId,
             roomId,
             x: closest.x,
@@ -299,6 +316,27 @@ export default function CanvasStage() {
       ref={containerRef}
       className={`absolute inset-0 overflow-hidden bg-slate-50 ${cursorClass}`}
     >
+      {/* Phase 10 Upload Blueprint empty floor state */}
+      {floorRooms.length === 0 && floorPipes.length === 0 && floorSensors.length === 0 && activeFloor && !activeFloor.blueprintUrl && (
+         <div className="absolute inset-0 flex items-center justify-center z-20 pointer-events-none">
+            <label className="pointer-events-auto cursor-pointer flex items-center gap-3 bg-white px-8 py-5 rounded-2xl shadow-xl border border-slate-200 text-slate-700 hover:bg-slate-50 transition-colors">
+               <input type="file" accept="image/png, image/jpeg" className="hidden" onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file && activeFloorId) {
+                     const reader = new FileReader();
+                     reader.onload = (ev) => {
+                        const baseUrl = ev.target?.result as string;
+                        useAppStore.getState().setFloorBlueprint(activeFloorId, baseUrl);
+                     };
+                     reader.readAsDataURL(file);
+                  }
+               }} />
+               <Upload size={24} className="text-blue-500" />
+               <span className="font-semibold text-lg">Upload Floor Plan</span>
+            </label>
+         </div>
+      )}
+
       <Stage
         ref={stageRef}
         width={dimensions.width}
@@ -308,6 +346,13 @@ export default function CanvasStage() {
         onDblClick={handleStageDblClick}
         onDblTap={handleStageDblClick as any}
       >
+        {/* Phase 10 Blueprint Background Layer */}
+        <Layer>
+          {activeFloor && activeFloor.blueprintUrl && (
+            <BlueprintImage url={activeFloor.blueprintUrl} />
+          )}
+        </Layer>
+
         {/* Grid layer (non-interactive) */}
         <Layer listening={false}>
           {/* Dim grid slightly in cinema mode */}
