@@ -1,4 +1,13 @@
 import { Room, Pipe } from '@/store/useAppStore';
+import Konva from 'konva';
+
+// Calculate the relative mouse position in stage coordinates (taking scale/zoom into account)
+export function getRelativePointerPosition(stage: Konva.Stage): { x: number; y: number } | null {
+  const transform = stage.getAbsoluteTransform().copy();
+  transform.invert();
+  const pos = stage.getPointerPosition();
+  return pos ? transform.point(pos) : null;
+}
 
 // Find closest point on a set of Pipes
 export function getClosestPointOnPipes(

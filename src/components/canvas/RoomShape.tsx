@@ -6,6 +6,7 @@ import { useAppStore } from '@/store/useAppStore';
 import type { Room } from '@/store/useAppStore';
 import type { KonvaEventObject } from 'konva/lib/Node';
 import Konva from 'konva';
+import { getRelativePointerPosition } from '@/utils/geometry';
 
 interface RoomShapeProps {
   room: Room;
@@ -116,7 +117,7 @@ export default function RoomShape({ room, opacity = 1 }: { room: Room, opacity?:
 
     const stage = e.target.getStage();
     if (!stage) return;
-    const pos = stage.getPointerPosition();
+    const pos = getRelativePointerPosition(stage);
     if (!pos) return;
 
     // Determine if we're near the border

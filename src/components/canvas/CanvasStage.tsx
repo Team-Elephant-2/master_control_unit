@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useRef, useState, useEffect, useCallback } from 'react';
-import { Stage, Layer, Circle, Group, Image as KonvaImage } from 'react-konva';
+import { Stage, Layer, Circle, Rect, Group, Image as KonvaImage } from 'react-konva';
 import Konva from 'konva';
 import { useAppStore, type Sensor, type SensorType } from '@/store/useAppStore';
 import RoomShape from './RoomShape';
@@ -23,7 +23,7 @@ function BlueprintImage({ url }: { url: string }) {
 }
 
 import type { KonvaEventObject } from 'konva/lib/Node';
-import { getClosestPointOnPipes, findRoomForPoint } from '@/utils/geometry';
+import { getClosestPointOnPipes, findRoomForPoint, getRelativePointerPosition } from '@/utils/geometry';
 import { Cpu, Maximize, Activity, Thermometer, Droplets, Zap, DoorClosed, Upload } from 'lucide-react';
 
 // ── Grid dot rendering ──────────────────────────────────────────────
@@ -60,6 +60,7 @@ function GridDots({ width, height }: { width: number; height: number }) {
 export default function CanvasStage() {
   const containerRef = useRef<HTMLDivElement>(null);
   const stageRef = useRef<any>(null);
+  const lastFocusRef = useRef<string | null>(null);
 
   const [dimensions, setDimensions] = useState({ width: 800, height: 600 });
   
@@ -96,6 +97,13 @@ export default function CanvasStage() {
   const floorPipes = pipes.filter((p) => p.floorId === activeFloorId);
   const floorSensors = sensors.filter((s) => s.floorId === activeFloorId);
 
+  const handleResetView = useCallback(() => {
+    setSelectedId(null);
+    setFocusedRoomId(null);
+    setStagePosition(0, 0);
+    setStageScale(1);
+  }, [setSelectedId, setFocusedRoomId, setStagePosition, setStageScale]);
+
   // Phase 9: Flow State logic
   const isFlowing = React.useMemo(() => {
     const hasPump = floorSensors.some(s => s.type === 'pump');
@@ -126,7 +134,6 @@ export default function CanvasStage() {
     });
 
     observer.observe(el);
-    // Set initial size
     setDimensions({ width: el.offsetWidth, height: el.offsetHeight });
 
     return () => observer.disconnect();
@@ -150,13 +157,6 @@ export default function CanvasStage() {
   }, [canvasMode, selectedId, deleteEntity]);
 
   // ── Click handler ───────────────────────────────────────────────
-
-  const getRelativePointerPosition = (stage: Konva.Stage) => {
-    const transform = stage.getAbsoluteTransform().copy();
-    transform.invert();
-    const pos = stage.getPointerPosition();
-    return pos ? transform.point(pos) : null;
-  };
 
   const handleStageClick = useCallback(
     (e: KonvaEventObject<MouseEvent>) => {
@@ -186,8 +186,6 @@ export default function CanvasStage() {
             return;
           }
           
-          // Use a default hardware ID since window.prompt is blocked in some environments (like VSCode webviews)
-          // The user can edit this in the RightSidebar.
           const defaultHardwareId = Math.floor(Math.random() * 1000) + 1;
           const roomId = findRoomForPoint(closest.x, closest.y, floorRooms);
 
@@ -203,11 +201,8 @@ export default function CanvasStage() {
         }
 
         case 'select':
-          // Only deselect if clicking on the stage background (not a shape)
-          if (e.target === stage) {
+          if (e.target.getStage() === e.target) {
             setSelectedId(null);
-            
-            // If we click background, reset focus if nothing is selected
             if (focusedRoomId) {
               handleResetView();
             }
@@ -215,33 +210,40 @@ export default function CanvasStage() {
           break;
       }
     },
-    [canvasMode, activeFloorId, drawingPipePoints, floorPipes, floorRooms, addRoom, setDrawingPipePoints, setSelectedId, focusedRoomId],
+    [canvasMode, activeFloorId, drawingPipePoints, floorPipes, floorRooms, addRoom, setDrawingPipePoints, setSelectedId, focusedRoomId, handleResetView],
   );
 
   // ── Animated Room Focus ─────────────────────────────────────────
 
   useEffect(() => {
     if (!stageRef.current) return;
-    const stage = stageRef.current;
+    const stageNode = stageRef.current;
 
+    // CASE 1: No room focused.
     if (!focusedRoomId) {
-      // Animate back to default
-      new Konva.Tween({
-        node: stage,
-        duration: 0.4,
-        scaleX: 1,
-        scaleY: 1,
-        x: 0,
-        y: 0,
-        easing: Konva.Easings.EaseInOut,
-      }).play();
+      if (lastFocusRef.current !== null) {
+        // We JUST lost focus. Animate back to default view.
+        new Konva.Tween({
+          node: stageNode,
+          duration: 0.4,
+          scaleX: 1, scaleY: 1, x: 0, y: 0,
+          easing: Konva.Easings.EaseInOut,
+          onFinish: () => {
+             setStagePosition(0, 0);
+             setStageScale(1);
+          }
+        }).play();
+      }
+      lastFocusRef.current = null;
       return;
     }
+
+    // CASE 2: Room is focused. Run centering logic if focus changed OR viewport size changed.
+    lastFocusRef.current = focusedRoomId;
 
     const room = floorRooms.find(r => r.id === focusedRoomId);
     if (!room) return;
 
-    // Calculate bounding box of the room
     const pts = room.polygonPoints;
     let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
     for (let i = 0; i < pts.length; i += 2) {
@@ -253,14 +255,11 @@ export default function CanvasStage() {
 
     const roomW = maxX - minX;
     const roomH = maxY - minY;
-    
-    // Target scale (padding 100px)
     const padding = 150;
     const scale = Math.min(
       dimensions.width / (roomW + padding),
       dimensions.height / (roomH + padding)
     );
-    // Limit max zoom
     const finalScale = Math.min(scale, 2.5);
 
     const centerX = minX + roomW / 2;
@@ -270,7 +269,7 @@ export default function CanvasStage() {
     const targetY = dimensions.height / 2 - centerY * finalScale;
 
     new Konva.Tween({
-      node: stage,
+      node: stageNode,
       duration: 0.5,
       scaleX: finalScale,
       scaleY: finalScale,
@@ -284,13 +283,6 @@ export default function CanvasStage() {
     }).play();
 
   }, [focusedRoomId, dimensions, floorRooms, setStagePosition, setStageScale]);
-
-  const handleResetView = () => {
-    setSelectedId(null);
-    setFocusedRoomId(null);
-    setStagePosition(0, 0);
-    setStageScale(1);
-  };
 
   // ── Panning & Zooming Handlers ──────────────────────────────────
 
@@ -310,8 +302,6 @@ export default function CanvasStage() {
 
     const scaleBy = 1.1;
     const newScale = e.evt.deltaY < 0 ? oldScale * scaleBy : oldScale / scaleBy;
-
-    // Limit scale
     const finalScale = Math.max(0.1, Math.min(newScale, 5));
 
     const newPos = {
@@ -323,7 +313,6 @@ export default function CanvasStage() {
     setStagePosition(newPos.x, newPos.y);
   };
 
-    // Update store during drag for reactive feedback
   const handleDragMove = (e: KonvaEventObject<DragEvent>) => {
     if (e.target === stageRef.current) {
       setStagePosition(e.target.x(), e.target.y());
@@ -336,8 +325,6 @@ export default function CanvasStage() {
     }
   };
 
-  // ── Double-click to finalize pipe ───────────────────────────────
-
   const handleStageDblClick = useCallback(
     (e: KonvaEventObject<MouseEvent>) => {
       const stage = e.target.getStage();
@@ -347,20 +334,15 @@ export default function CanvasStage() {
 
       if (canvasMode !== 'draw_pipe' || !activeFloorId) return;
 
-      // Need at least 2 points (4 numbers) to make a pipe
       if (drawingPipePoints.length >= 4) {
         addPipe(activeFloorId, drawingPipePoints);
       } else {
-        // Not enough points, just clear
         setDrawingPipePoints([]);
       }
-
       e.cancelBubble = true;
     },
     [canvasMode, activeFloorId, drawingPipePoints, addPipe, setDrawingPipePoints],
   );
-
-  // ── Cursor style ────────────────────────────────────────────────
 
   const cursorClass =
     canvasMode === 'add_room' || canvasMode === 'draw_pipe' || canvasMode === 'add_sensor'
@@ -383,7 +365,6 @@ export default function CanvasStage() {
       ref={containerRef}
       className={`absolute inset-0 overflow-hidden bg-slate-50 ${cursorClass}`}
     >
-      {/* Phase 10 Upload Blueprint empty floor state */}
       {floorRooms.length === 0 && floorPipes.length === 0 && floorSensors.length === 0 && activeFloor && !activeFloor.blueprintUrl && (
          <div className="absolute inset-0 flex items-center justify-center z-20 pointer-events-none">
             <label className="pointer-events-auto cursor-pointer flex items-center gap-3 bg-white px-8 py-5 rounded-2xl shadow-xl border border-slate-200 text-slate-700 hover:bg-slate-50 transition-colors">
@@ -412,7 +393,7 @@ export default function CanvasStage() {
         y={stageY}
         scaleX={stageScale}
         scaleY={stageScale}
-        draggable={canvasMode === 'select' && !focusedRoomId}
+        draggable={!focusedRoomId}
         onWheel={handleWheel}
         onDragMove={handleDragMove}
         onDragEnd={handleDragEnd}
@@ -421,34 +402,27 @@ export default function CanvasStage() {
         onDblClick={handleStageDblClick}
         onDblTap={handleStageDblClick as any}
       >
-        {/* Background catch-all for dragging the stage */}
-        <Layer>
-           <Circle 
-              x={0} 
-              y={0} 
-              radius={10000} 
+        <Layer id="background-layer">
+           <Rect 
+              x={-50000} 
+              y={-50000} 
+              width={100000} 
+              height={100000} 
               fill="transparent" 
-              listening={canvasMode === 'select'} 
+              listening={true}
            />
+           {activeFloor && activeFloor.blueprintUrl && (
+             <BlueprintImage url={activeFloor.blueprintUrl} />
+           )}
         </Layer>
-        {/* Phase 10 Blueprint Background Layer */}
-        <Layer>
-          {activeFloor && activeFloor.blueprintUrl && (
-            <BlueprintImage url={activeFloor.blueprintUrl} />
-          )}
-        </Layer>
-
-        {/* Grid layer (non-interactive) */}
+        
         <Layer listening={false}>
-          {/* Dim grid slightly in cinema mode */}
           <Group opacity={focusedRoomId ? 0.5 : 1}>
             <GridDots width={dimensions.width} height={dimensions.height} />
           </Group>
         </Layer>
 
-        {/* Content layer */}
         <Layer>
-          {/* Rooms (Bottom layer) */}
           {floorRooms.map((room) => (
             <RoomShape 
                key={room.id} 
@@ -457,17 +431,14 @@ export default function CanvasStage() {
             />
           ))}
 
-          {/* Rendered pipes (Middle layer) */}
           {floorPipes.map((pipe) => (
             <PipeShape key={pipe.id} pipe={pipe} isFlowing={isFlowing} />
           ))}
 
-          {/* In-progress drawing pipe (Top layer) */}
           {drawingPipePoints.length > 0 && (
             <DrawingPipe points={drawingPipePoints} />
           )}
 
-          {/* Sensors (Highest layer) */}
           {floorSensors.map((sensor) => (
             <SensorShape 
                key={sensor.id} 
@@ -480,8 +451,6 @@ export default function CanvasStage() {
         </Layer>
       </Stage>
 
-      {/* HTML Overlays */}
-      {/* 1. Reset View Button (Cinema Mode Active) */}
       <div className={`absolute bottom-6 left-1/2 -translate-x-1/2 transition-all duration-300 ${focusedRoomId ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4 pointer-events-none'}`}>
         <button
           onClick={handleResetView}
@@ -492,14 +461,13 @@ export default function CanvasStage() {
         </button>
       </div>
 
-      {/* 2. Sensor Hover Tooltip */}
       {hoveredSensor && (
         <div 
           className="pointer-events-none absolute z-50 flex flex-col gap-1 rounded-lg bg-slate-900/95 px-3 py-2.5 text-white shadow-xl backdrop-blur-sm border border-slate-700"
           style={{
             left: hoveredSensor.x,
             top: hoveredSensor.y,
-            transform: 'translate(-50%, -120%)' // Center above cursor
+            transform: 'translate(-50%, -120%)'
           }}
         >
           <div className="flex items-center gap-1.5 text-xs font-medium text-slate-300 mb-0.5">
