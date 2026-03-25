@@ -134,15 +134,25 @@ export default function SensorShape({ sensor, opacity = 1, onHoverIn, onHoverOut
   };
 
   const dragBoundFunc = (pos: { x: number; y: number }) => {
+    const stage = circleRef.current?.getStage();
+    if (!stage) return pos;
+
+    const transform = stage.getAbsoluteTransform().copy().invert();
+    const stagePos = transform.point(pos);
+
     const floorPipes = pipes.filter((p) => p.floorId === activeFloorId);
-    const closest = getClosestPointOnPipes(pos.x, pos.y, floorPipes);
-    if (closest) return { x: closest.x, y: closest.y };
+    const closest = getClosestPointOnPipes(stagePos.x, stagePos.y, floorPipes);
+    
+    if (closest) {
+      return stage.getAbsoluteTransform().point({ x: closest.x, y: closest.y });
+    }
     return pos;
   };
 
   const handleDragEnd = (e: KonvaEventObject<DragEvent>) => {
     e.cancelBubble = true;
     const node = e.target;
+    // node.x/y are already in local stage coordinates
     const newX = node.x();
     const newY = node.y();
     const floorRooms = rooms.filter((r) => r.floorId === activeFloorId);
@@ -168,13 +178,9 @@ export default function SensorShape({ sensor, opacity = 1, onHoverIn, onHoverOut
         
         if (onHoverIn) {
            const stage = e.target.getStage();
-           if (stage) {
-             const pos = stage.getPointerPosition();
-             if (pos) {
-                const absTransform = stage.getAbsoluteTransform();
-                const screenPos = { x: pos.x * absTransform.m[0] + absTransform.m[4], y: pos.y * absTransform.m[3] + absTransform.m[5] };
-                onHoverIn(screenPos.x, screenPos.y - 10);
-             }
+           const pos = stage?.getPointerPosition();
+           if (pos) {
+              onHoverIn(pos.x, pos.y - 10);
            }
         }
       }}
@@ -186,13 +192,9 @@ export default function SensorShape({ sensor, opacity = 1, onHoverIn, onHoverOut
       onMouseMove={(e) => {
          if (onHoverIn) {
             const stage = e.target.getStage();
-            if (stage) {
-               const pos = stage.getPointerPosition();
-               if (pos) {
-                 const absTransform = stage.getAbsoluteTransform();
-                 const screenPos = { x: pos.x * absTransform.m[0] + absTransform.m[4], y: pos.y * absTransform.m[3] + absTransform.m[5] };
-                 onHoverIn(screenPos.x, screenPos.y - 10);
-               }
+            const pos = stage?.getPointerPosition();
+            if (pos) {
+               onHoverIn(pos.x, pos.y - 10);
             }
          }
       }}
