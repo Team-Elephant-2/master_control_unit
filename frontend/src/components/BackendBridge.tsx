@@ -75,7 +75,9 @@ export default function BackendBridge() {
       };
 
       ws.onerror = (error) => {
-        console.error('[BackendBridge] WebSocket error:', error);
+        // WebSocket error events don't provide much detail in browsers for security reasons.
+        // We log the readyState to see if the connection even started.
+        console.error('[BackendBridge] WebSocket error occurred. ReadyState:', ws.readyState, error);
       };
 
       ws.onclose = () => {
