@@ -355,6 +355,18 @@ export const useAppStore = create<AppState>()(
     const target = state.sensors.find((s) => s.id === sensorId);
     if (!target) return state;
 
+    // Phase 12: Backend Integration
+    // Tell the backend about the leak. The backend will broadcast this
+    // to all connected clients (including us) via WebSockets.
+    fetch('/api/sensor', {
+      method: 'POST',
+      headers: { 
+        'Content-Type': 'application/json',
+        'ngrok-skip-browser-warning': 'true'
+      },
+      body: JSON.stringify({ node_id: target.hardwareId, is_wet: true })
+    }).catch(err => console.error('[Simulator] Failed to notify backend of leak:', err));
+
     return {
       sensors: state.sensors.map((s) => {
         if (s.id === sensorId) return { ...s, isWet: true };
@@ -380,16 +392,32 @@ export const useAppStore = create<AppState>()(
     sensors: state.sensors.map((s) => s.id === sensorId ? { ...s, isOpen: !s.isOpen } : s),
   })),
 
-  resetSimulation: () => set((state) => ({
-    sensors: state.sensors.map((s) => {
-      let overrides = {};
-      if (s.type === 'water_drop' || s.type === 'humidity') overrides = { isWet: false };
-      if (s.type === 'master_flow') overrides = { value: 0 };
-      if (s.type === 'pump') overrides = { isOn: true };
-      if (s.type === 'valve') overrides = { isOpen: true };
-      return { ...s, ...overrides };
-    })
-  })),
+  resetSimulation: () => set((state) => {
+    // Reset backend sensor state if possible
+    state.sensors.forEach(s => {
+      if (s.type === 'water_drop' || s.type === 'humidity') {
+        fetch('/api/sensor', {
+          method: 'POST',
+          headers: { 
+            'Content-Type': 'application/json',
+            'ngrok-skip-browser-warning': 'true'
+          },
+          body: JSON.stringify({ node_id: s.hardwareId, is_wet: false })
+        }).catch(() => {});
+      }
+    });
+
+    return {
+      sensors: state.sensors.map((s) => {
+        let overrides = {};
+        if (s.type === 'water_drop' || s.type === 'humidity') overrides = { isWet: false };
+        if (s.type === 'master_flow') overrides = { value: 0 };
+        if (s.type === 'pump') overrides = { isOn: true };
+        if (s.type === 'valve') overrides = { isOpen: true };
+        return { ...s, ...overrides };
+      })
+    };
+  }),
 
   // ── Phase 10 Blueprint Tracing ──────────────────────────────────
 

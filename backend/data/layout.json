@@ -14,6 +14,11 @@
       "id": "floor-1774538073353-2",
       "name": "Floor 3",
       "blueprintUrl": null
+    },
+    {
+      "id": "floor-1774538478331-2",
+      "name": "Floor 4",
+      "blueprintUrl": null
     }
   ],
   "rooms": [

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
+import BackendBridge from "@/components/BackendBridge";
 
 const inter = Inter({
   variable: "--font-geist-sans",
@@ -21,6 +22,7 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${inter.variable} h-full antialiased`} suppressHydrationWarning>
       <body className="h-full bg-white font-sans text-slate-900" suppressHydrationWarning>
+        <BackendBridge />
         {children}
       </body>
     </html>
