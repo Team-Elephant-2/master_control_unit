@@ -37,6 +37,7 @@ export default function BackendBridge() {
   const socketRef = useRef<WebSocket | null>(null);
   const lastSavedLayoutRef = useRef<string>('');
   const lastLocalChangeTimeRef = useRef<number>(0);
+  const hasLoadedRef = useRef<boolean>(false);
 
   useEffect(() => {
     let reconnectTimeout: NodeJS.Timeout;
@@ -106,8 +107,15 @@ export default function BackendBridge() {
         console.log('[BackendBridge] Loaded initial layout');
         lastSavedLayoutRef.current = JSON.stringify(data);
         setFullLayout(data);
+        hasLoadedRef.current = true;
       })
-      .catch(err => console.error('[BackendBridge] Error fetching layout:', err));
+      .catch(err => {
+        console.error('[BackendBridge] Error fetching layout:', err);
+        // Even on error, we mark as loaded so user can start building
+        // but maybe with a delay or under certain conditions.
+        // For now, let's allow it so the app remains functional.
+        hasLoadedRef.current = true;
+      });
 
     return () => {
       if (socketRef.current) {
@@ -117,15 +125,20 @@ export default function BackendBridge() {
     };
   }, [syncSensorState, setFullLayout]);
 
-  // Handle Auto-Saving (Persistent layout changes)
+    // Handle Auto-Saving (Persistent layout changes)
   useEffect(() => {
+    // DO NOT save if we haven't even finished the initial load sequence.
+    // This prevents the default store state from overwriting actual server data.
+    if (!hasLoadedRef.current) return;
+
     const currentLayout = { floors, rooms, pipes, sensors };
     const layoutJson = JSON.stringify(currentLayout);
 
-    // If layout changed locally, mark the timestamp to lockout server overrides
-    if (layoutJson !== lastSavedLayoutRef.current) {
-      lastLocalChangeTimeRef.current = Date.now();
-    }
+    // If layout matches what we last saved/loaded, no need to do anything
+    if (layoutJson === lastSavedLayoutRef.current) return;
+
+    // If layout changed locally, mark the timestamp to lockout server overrides via WebSocket
+    lastLocalChangeTimeRef.current = Date.now();
 
     // Debounce save
     const timeout = setTimeout(() => {
