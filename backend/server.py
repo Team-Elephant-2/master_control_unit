@@ -1,10 +1,12 @@
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+import asyncio
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from datetime import datetime
 import uvicorn
 import json
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Set
 import os
 
 app = FastAPI()
@@ -13,7 +15,7 @@ app = FastAPI()
 # Allows the frontend (typically on port 3000) to communicate with this backend
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
+    allow_origins=["*"], # More permissive for ngrok/other devices
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -60,26 +62,50 @@ def save_layout_to_disk():
 # Load initial layout
 load_layout()
 
-# Keep track of active WebSocket connections for the frontend
+# ── Connection Management (WebSocket + SSE) ───────────────────────────
 class ConnectionManager:
     def __init__(self):
         self.active_connections: List[WebSocket] = []
+        self.sse_queues: Set[asyncio.Queue] = set()
 
-    async def connect(self, websocket: WebSocket):
+    # WebSocket methods
+    async def connect_ws(self, websocket: WebSocket):
         await websocket.accept()
         self.active_connections.append(websocket)
         # Send current state upon connection
         await websocket.send_text(json.dumps({"type": "init", "data": sensor_states}))
 
-    def disconnect(self, websocket: WebSocket):
-        self.active_connections.remove(websocket)
+    def disconnect_ws(self, websocket: WebSocket):
+        if websocket in self.active_connections:
+            self.active_connections.remove(websocket)
+
+    # SSE methods
+    async def subscribe_sse(self):
+        queue = asyncio.Queue()
+        self.sse_queues.add(queue)
+        # Immediately push initial state to the new subscriber
+        await queue.put(json.dumps({"type": "init", "data": sensor_states}))
+        return queue
+
+    def unsubscribe_sse(self, queue: asyncio.Queue):
+        if queue in self.sse_queues:
+            self.sse_queues.remove(queue)
 
     async def broadcast(self, message: str):
+        # Broadcast to WebSockets
         for connection in self.active_connections:
             try:
                 await connection.send_text(message)
             except Exception:
                 # Handle stale connections
+                pass
+        
+        # Broadcast to SSE subscribers
+        for queue in list(self.sse_queues):
+            try:
+                await queue.put(message)
+            except Exception:
+                # Handle stale queues
                 pass
 
 manager = ConnectionManager()
@@ -190,11 +216,60 @@ async def update_layout(data: LayoutData):
     
     return {"status": "success"}
 
+@app.get("/api/events")
+async def sse_endpoint(request: Request):
+    """
+    Sever-Sent Events endpoint for the frontend.
+    """
+    queue = await manager.subscribe_sse()
+    client_ip = request.client.host if request.client else "unknown"
+    print(f"[SSE] New connection request from {client_ip}")
+
+    async def event_generator():
+        try:
+            # Buffer Breaker: Some proxies (ngrok, etc.) buffer responses until they reach a certain size.
+            # We send 4KB of whitespace in a comment to force a flush.
+            yield ": connected\n"
+            yield ":" + (" " * 4096) + "\n\n"
+            
+            print(f"[SSE] Stream started for {client_ip}")
+            
+            while True:
+                # Check if client disconnected
+                if await request.is_disconnected():
+                    print(f"[SSE] Client {client_ip} disconnected (request.is_disconnected)")
+                    break
+                
+                try:
+                    # Wait for a message with a timeout to allow for periodic pings
+                    message = await asyncio.wait_for(queue.get(), timeout=20.0)
+                    print(f"[SSE] Yielding message to {client_ip}: {message[:50]}...")
+                    yield f"data: {message}\n\n"
+                except asyncio.TimeoutError:
+                    # Send a heartbeat ping to keep connection alive
+                    yield ": ping\n\n"
+                    
+        except asyncio.CancelledError:
+            print(f"[SSE] Connection cancelled for {client_ip}")
+        finally:
+            manager.unsubscribe_sse(queue)
+            print(f"[SSE] Subscription ended for {client_ip}")
+
+    return StreamingResponse(
+        event_generator(), 
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        }
+    )
+
 # ── WebSocket Route ──────────────────────────────────────────────────
 
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
-    await manager.connect(websocket)
+    await manager.connect_ws(websocket)
     try:
         while True:
             # We mostly use WS for pushing server -> client, 
@@ -202,13 +277,14 @@ async def websocket_endpoint(websocket: WebSocket):
             data = await websocket.receive_text()
             # Handle incoming WS messages if needed in the future
     except WebSocketDisconnect:
-        manager.disconnect(websocket)
+        manager.disconnect_ws(websocket)
 
 # ── Main Entry Point ──────────────────────────────────────────────────
 
 if __name__ == "__main__":
     print("Starting TMS Backend...")
     print("Listening for ESP32 data on /api/sensor (Port 5000)")
+    print("SSE endpoint available on /api/events")
     print("Websocket available on /ws")
     
     # host='0.0.0.0' allows connections from other devices on the same network (like ESP32)
