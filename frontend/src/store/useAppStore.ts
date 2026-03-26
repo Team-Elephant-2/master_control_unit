@@ -132,6 +132,7 @@ interface AppState {
 
   // Backend Sync
   syncSensorState: (hardwareId: number, isWet: boolean) => void;
+  setFullLayout: (layout: { floors: Floor[]; rooms: Room[]; pipes: Pipe[]; sensors: Sensor[] }) => void;
 }
 
 // ── Helpers ─────────────────────────────────────────────────────────
@@ -157,12 +158,11 @@ const DEFAULT_FLOOR: Floor = { id: 'floor-1', name: 'Floor 1' };
 // ── Store ───────────────────────────────────────────────────────────
 
 export const useAppStore = create<AppState>()(
-  persist(
-    (set) => ({
-      floors: [DEFAULT_FLOOR],
-      rooms: [],
-      pipes: [],
-      sensors: [],
+  (set) => ({
+    floors: [DEFAULT_FLOOR],
+    rooms: [],
+    pipes: [],
+    sensors: [],
       activeFloorId: DEFAULT_FLOOR.id,
       viewMode: 'floor',
 
@@ -448,13 +448,19 @@ export const useAppStore = create<AppState>()(
 
       return { sensors: updatedSensors };
     }),
-}), { name: 'tms-storage' }));
 
-// Cross-tab synchronization
-if (typeof window !== 'undefined') {
-  window.addEventListener('storage', (e) => {
-    if (e.key === 'tms-storage') {
-      useAppStore.persist.rehydrate();
-    }
-  });
-}
+  setFullLayout: (layout) => set((state) => ({
+    ...state,
+    floors: layout.floors || state.floors,
+    rooms: layout.rooms || state.rooms,
+    pipes: layout.pipes || state.pipes,
+    sensors: layout.sensors || state.sensors,
+    // If active floor no longer exists, reset to the first available floor
+    activeFloorId: (layout.floors && !layout.floors.find(f => f.id === state.activeFloorId)) 
+      ? (layout.floors[0]?.id ?? null) 
+      : state.activeFloorId,
+  })),
+}),);
+
+// Remove cross-tab synchronization logic as we'll use WebSockets instead
+

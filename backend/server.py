@@ -4,7 +4,8 @@ from pydantic import BaseModel
 from datetime import datetime
 import uvicorn
 import json
-from typing import List, Dict
+from typing import List, Dict, Optional
+import os
 
 app = FastAPI()
 
@@ -21,6 +22,43 @@ app.add_middleware(
 # ── State Management ──────────────────────────────────────────────────
 # Store the latest state for each node_id
 sensor_states: Dict[int, bool] = {}
+
+# File path for layout persistence
+LAYOUT_FILE = "data/layout.json"
+
+# Default layout if none exists
+DEFAULT_LAYOUT = {
+    "floors": [{"id": "floor-1", "name": "Floor 1"}],
+    "rooms": [],
+    "pipes": [],
+    "sensors": []
+}
+
+# Current global layout
+global_layout = DEFAULT_LAYOUT
+
+def load_layout():
+    global global_layout
+    if os.path.exists(LAYOUT_FILE):
+        try:
+            with open(LAYOUT_FILE, "r") as f:
+                global_layout = json.load(f)
+        except Exception as e:
+            print(f"Error loading layout: {e}")
+            global_layout = DEFAULT_LAYOUT
+    else:
+        global_layout = DEFAULT_LAYOUT
+
+def save_layout_to_disk():
+    try:
+        os.makedirs(os.path.dirname(LAYOUT_FILE), exist_ok=True)
+        with open(LAYOUT_FILE, "w") as f:
+            json.dump(global_layout, f, indent=2)
+    except Exception as e:
+        print(f"Error saving layout: {e}")
+
+# Load initial layout
+load_layout()
 
 # Keep track of active WebSocket connections for the frontend
 class ConnectionManager:
@@ -50,6 +88,42 @@ manager = ConnectionManager()
 class SensorData(BaseModel):
     node_id: int
     is_wet: bool
+
+class FloorModel(BaseModel):
+    id: str
+    name: str
+    blueprintUrl: Optional[str] = None
+
+class RoomModel(BaseModel):
+    id: str
+    floorId: str
+    name: str
+    polygonPoints: List[float]
+
+class PipeModel(BaseModel):
+    id: str
+    floorId: str
+    points: List[float]
+
+class SensorModel(BaseModel):
+    id: str
+    hardwareId: int
+    type: str
+    floorId: str
+    roomId: Optional[str] = None
+    x: float
+    y: float
+    isMaster: Optional[bool] = None
+    isWet: Optional[bool] = None
+    value: Optional[float] = None
+    isOn: Optional[bool] = None
+    isOpen: Optional[bool] = None
+
+class LayoutData(BaseModel):
+    floors: List[FloorModel]
+    rooms: List[RoomModel]
+    pipes: List[PipeModel]
+    sensors: List[SensorModel]
 
 # ── API Routes ────────────────────────────────────────────────────────
 
@@ -90,6 +164,30 @@ async def get_state():
     Fetch the current state of all sensors.
     """
     return sensor_states
+
+@app.get("/api/layout")
+async def get_layout():
+    """
+    Fetch the global shared layout.
+    """
+    return global_layout
+
+@app.post("/api/layout")
+async def update_layout(data: LayoutData):
+    """
+    Update the global shared layout and notify all clients.
+    """
+    global global_layout
+    global_layout = data.dict()
+    save_layout_to_disk()
+    
+    # Broadcast layout update to all connected clients
+    await manager.broadcast(json.dumps({
+        "type": "layout_update",
+        "data": global_layout
+    }))
+    
+    return {"status": "success"}
 
 # ── WebSocket Route ──────────────────────────────────────────────────
 
