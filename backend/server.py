@@ -111,6 +111,7 @@ class SensorModel(BaseModel):
     type: str
     floorId: str
     roomId: Optional[str] = None
+    pipeId: Optional[str] = None
     x: float
     y: float
     isMaster: Optional[bool] = None

@@ -194,6 +194,7 @@ export default function CanvasStage() {
             type: selectedType as SensorType,
             floorId: activeFloorId,
             roomId,
+            pipeId: closest.pipeId,
             x: closest.x,
             y: closest.y
           });

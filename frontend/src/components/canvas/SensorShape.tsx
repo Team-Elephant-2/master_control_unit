@@ -155,9 +155,14 @@ export default function SensorShape({ sensor, opacity = 1, onHoverIn, onHoverOut
     // node.x/y are already in local stage coordinates
     const newX = node.x();
     const newY = node.y();
+    
+    const floorPipes = pipes.filter((p) => p.floorId === activeFloorId);
+    const closest = getClosestPointOnPipes(newX, newY, floorPipes);
+    const pipeId = closest ? closest.pipeId : null;
+
     const floorRooms = rooms.filter((r) => r.floorId === activeFloorId);
     const newRoomId = findRoomForPoint(newX, newY, floorRooms);
-    updateSensorPosition(sensor.id, newX, newY, newRoomId);
+    updateSensorPosition(sensor.id, newX, newY, newRoomId, pipeId);
   };
 
   return (

@@ -14,12 +14,13 @@ export function getClosestPointOnPipes(
   px: number,
   py: number,
   pipes: Pipe[]
-): { x: number; y: number; dist: number } | null {
+): { x: number; y: number; dist: number; pipeId: string } | null {
   if (pipes.length === 0) return null;
 
   let minDist = Infinity;
   let bestX = px;
   let bestY = py;
+  let bestPipeId = '';
 
   for (const pipe of pipes) {
     const points = pipe.points;
@@ -45,12 +46,13 @@ export function getClosestPointOnPipes(
         minDist = dist;
         bestX = projX;
         bestY = projY;
+        bestPipeId = pipe.id;
       }
     }
   }
 
   if (minDist === Infinity) return null;
-  return { x: bestX, y: bestY, dist: minDist };
+  return { x: bestX, y: bestY, dist: minDist, pipeId: bestPipeId };
 }
 
 // Ray-casting algorithm for Point-in-Polygon

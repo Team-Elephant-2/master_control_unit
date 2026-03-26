@@ -50,6 +50,7 @@ export interface Sensor {
   type: SensorType;
   floorId: string;
   roomId: string | null;
+  pipeId?: string | null;
   x: number;
   y: number;
   isMaster?: boolean;
@@ -116,7 +117,7 @@ interface AppState {
 
   // Sensor actions
   addSensor: (sensor: Omit<Sensor, 'id'>) => void;
-  updateSensorPosition: (id: string, x: number, y: number, roomId: string | null) => void;
+  updateSensorPosition: (id: string, x: number, y: number, roomId: string | null, pipeId: string | null) => void;
   updateSensorHardwareId: (id: string, hardwareId: number) => void;
   setMasterSensor: (sensorId: string, floorId: string) => void;
 
@@ -236,13 +237,17 @@ export const useAppStore = create<AppState>()(
 
   setSelectedId: (id: string | null) => set({ selectedId: id }),
 
-  deleteEntity: (id: string) => set((state) => ({
-    rooms: state.rooms.filter((r) => r.id !== id),
-    pipes: state.pipes.filter((p) => p.id !== id),
-    sensors: state.sensors.filter((s) => s.id !== id),
-    selectedId: state.selectedId === id ? null : state.selectedId,
-    focusedRoomId: state.focusedRoomId === id ? null : state.focusedRoomId,
-  })),
+  deleteEntity: (id: string) => set((state) => {
+    // If it's a pipe, also delete sensors on that pipe
+    const isPipe = state.pipes.some(p => p.id === id);
+    return {
+      rooms: state.rooms.filter((r) => r.id !== id),
+      pipes: state.pipes.filter((p) => p.id !== id),
+      sensors: state.sensors.filter((s) => s.id !== id && (!isPipe || s.pipeId !== id)),
+      selectedId: state.selectedId === id ? null : state.selectedId,
+      focusedRoomId: state.focusedRoomId === id ? null : state.focusedRoomId,
+    };
+  }),
 
   setSelectedSensorType: (type: SensorType | null) => set({ selectedSensorType: type, canvasMode: type ? 'add_sensor' : 'select' }),
 
@@ -324,10 +329,10 @@ export const useAppStore = create<AppState>()(
     }));
   },
 
-  updateSensorPosition: (id: string, x: number, y: number, roomId: string | null) =>
+  updateSensorPosition: (id: string, x: number, y: number, roomId: string | null, pipeId: string | null) =>
     set((state) => ({
       sensors: state.sensors.map((s) =>
-        s.id === id ? { ...s, x, y, roomId } : s
+        s.id === id ? { ...s, x, y, roomId, pipeId } : s
       ),
     })),
 
