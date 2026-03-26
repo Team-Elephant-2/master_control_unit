@@ -129,6 +129,9 @@ interface AppState {
 
   // Phase 8 Utilities
   clearFloor: (floorId: string) => void;
+
+  // Backend Sync
+  syncSensorState: (hardwareId: number, isWet: boolean) => void;
 }
 
 // ── Helpers ─────────────────────────────────────────────────────────
@@ -413,6 +416,38 @@ export const useAppStore = create<AppState>()(
       stageScale: 1
     }));
   },
+  // ── Backend Sync ───────────────────────────────────────────────
+  
+  syncSensorState: (hardwareId: number, isWet: boolean) =>
+    set((state) => {
+      // Only sync for hardwareIds 1-10
+      if (hardwareId < 1 || hardwareId > 10) return state;
+
+      const updatedSensors = state.sensors.map((s) => {
+        if (s.hardwareId === hardwareId && (s.type === 'water_drop' || s.type === 'humidity')) {
+          if (s.isWet === isWet) return s;
+          console.log(`[Backend Sync] Sensor ${hardwareId} is now ${isWet ? 'WET' : 'DRY'}`);
+          return { ...s, isWet };
+        }
+        return s;
+      });
+
+      // Handle mitigation if this sensor just went WET
+      if (isWet) {
+        return {
+          sensors: updatedSensors.map((s) => {
+            const triggeringSensor = updatedSensors.find(ts => ts.hardwareId === hardwareId && ts.isWet);
+            if (triggeringSensor && s.floorId === triggeringSensor.floorId) {
+              if (s.type === 'pump') return { ...s, isOn: false };
+              if (s.type === 'valve') return { ...s, isOpen: false };
+            }
+            return s;
+          })
+        };
+      }
+
+      return { sensors: updatedSensors };
+    }),
 }), { name: 'tms-storage' }));
 
 // Cross-tab synchronization

@@ -8,7 +8,7 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "Aqua Monitor — Smart Water Leak Detection",
+  title: "herosense aqualarm — Smart Water Leak Detection",
   description:
     "Real-time water leak detection and monitoring dashboard for smart buildings.",
 };
