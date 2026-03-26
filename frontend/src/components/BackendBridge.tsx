@@ -36,6 +36,7 @@ export default function BackendBridge() {
 
   const socketRef = useRef<WebSocket | null>(null);
   const lastSavedLayoutRef = useRef<string>('');
+  const lastLocalChangeTimeRef = useRef<number>(0);
 
   useEffect(() => {
     let reconnectTimeout: NodeJS.Timeout;
@@ -62,6 +63,14 @@ export default function BackendBridge() {
             const { node_id, is_wet } = message.data;
             syncSensorState(Number(node_id), is_wet);
           } else if (message.type === 'layout_update') {
+            // Guard: If we recently made a local change, ignore server layout updates
+            // to prevent the "flickering" or "disappearing" issue during round-trips.
+            const now = Date.now();
+            if (now - lastLocalChangeTimeRef.current < 5000) {
+              console.log('[BackendBridge] Skipping server layout sync (recent local adjustment detected)');
+              return;
+            }
+
             console.log('[BackendBridge] Received layout update from server');
             const layoutJson = JSON.stringify(message.data);
             if (layoutJson !== lastSavedLayoutRef.current) {
@@ -113,8 +122,10 @@ export default function BackendBridge() {
     const currentLayout = { floors, rooms, pipes, sensors };
     const layoutJson = JSON.stringify(currentLayout);
 
-    // Skip if this change matches what we just sent or received
-    if (layoutJson === lastSavedLayoutRef.current) return;
+    // If layout changed locally, mark the timestamp to lockout server overrides
+    if (layoutJson !== lastSavedLayoutRef.current) {
+      lastLocalChangeTimeRef.current = Date.now();
+    }
 
     // Debounce save
     const timeout = setTimeout(() => {
@@ -129,6 +140,8 @@ export default function BackendBridge() {
       })
       .then(() => {
         lastSavedLayoutRef.current = layoutJson;
+        // Keep the lockout slightly active even after success to handle broadcast delays
+        lastLocalChangeTimeRef.current = Date.now(); 
       })
       .catch(err => console.error('[BackendBridge] Save layout failed:', err));
     }, 1000); // 1-second debounce
