@@ -87,7 +87,9 @@ export default function BackendBridge() {
     connect();
     
     // Initial fetch of the layout
-    fetch(BACKEND_API_URL)
+    fetch(BACKEND_API_URL, {
+      headers: { 'ngrok-skip-browser-warning': 'true' }
+    })
       .then(res => res.json())
       .then(data => {
         console.log('[BackendBridge] Loaded initial layout');
@@ -117,7 +119,10 @@ export default function BackendBridge() {
       console.log('[BackendBridge] Saving layout to backend...');
       fetch(BACKEND_API_URL, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'ngrok-skip-browser-warning': 'true'
+        },
         body: layoutJson
       })
       .then(() => {
