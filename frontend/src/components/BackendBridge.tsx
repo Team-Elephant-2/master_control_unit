@@ -3,8 +3,26 @@
 import { useEffect, useRef } from 'react';
 import { useAppStore } from '@/store/useAppStore';
 
-const BACKEND_WS_URL = 'ws://localhost:5000/ws';
-const BACKEND_API_URL = 'http://localhost:5000/api/layout';
+const getUrls = () => {
+  if (typeof window === 'undefined') return { ws: 'ws://localhost:5000/ws', api: '/api' };
+  
+  const { hostname, protocol } = window.location;
+  const isLocal = hostname === 'localhost' || hostname === '127.0.0.1';
+  const wsProtocol = protocol === 'https:' ? 'wss:' : 'ws:';
+  
+  // For local development, backend is likely on port 5000.
+  // For ngrok/production, assume backend is behind a proxy on the same host.
+  const wsHost = isLocal ? `${hostname}:5000` : hostname;
+  
+  return {
+    ws: `${wsProtocol}//${wsHost}/ws`,
+    api: '/api'
+  };
+};
+
+const URLS = getUrls();
+const BACKEND_WS_URL = URLS.ws;
+const BACKEND_API_URL = `${URLS.api}/layout`;
 
 export default function BackendBridge() {
   const syncSensorState = useAppStore((state) => state.syncSensorState);
