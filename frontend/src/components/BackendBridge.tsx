@@ -57,10 +57,16 @@ export default function BackendBridge() {
             syncSensorState(Number(id), isWet as boolean);
           });
         } else if (message.type === 'sensor_update') {
-          const { node_id, is_wet } = message.data;
-          console.log(`[BackendBridge] Sensor Update: Node ${node_id} is ${is_wet ? 'WET' : 'DRY'}`);
-          syncSensorState(Number(node_id), is_wet);
-        } else if (message.type === 'layout_update') {
+          const { node_id, is_wet, isOn } = message.data;
+          if (is_wet !== undefined) {
+            console.log(`[BackendBridge] Sensor Update: Node ${node_id} is ${is_wet ? 'WET' : 'DRY'}`);
+          }
+          if (isOn !== undefined) {
+            console.log(`[BackendBridge] Pump Update: Node ${node_id} is ${isOn ? 'ON' : 'OFF'}`);
+          }
+          syncSensorState(Number(node_id), is_wet, isOn);
+        }
+ else if (message.type === 'layout_update') {
           const now = Date.now();
           if (now - lastLocalChangeTimeRef.current < 5000) {
             console.log('[BackendBridge] Skipping server layout sync (recent local adjustment detected)');

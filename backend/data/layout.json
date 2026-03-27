@@ -19,6 +19,11 @@
       "id": "floor-1774538478331-2",
       "name": "Floor 4",
       "blueprintUrl": null
+    },
+    {
+      "id": "floor-1774560533200-2",
+      "name": "Floor 5",
+      "blueprintUrl": null
     }
   ],
   "rooms": [
@@ -153,6 +158,66 @@
         180.19970491803315,
         213.51810224878037
       ]
+    },
+    {
+      "id": "room-1774560538720-1",
+      "floorId": "floor-1774560533200-2",
+      "name": "Room 2",
+      "polygonPoints": [
+        332.5243792718642,
+        256.5706240901635,
+        495.8211270481541,
+        256.5706240901635,
+        495.8211270481541,
+        394.1027167170822,
+        332.5243792718642,
+        394.1027167170822
+      ]
+    },
+    {
+      "id": "room-1774560545358-3",
+      "floorId": "floor-1774560533200-2",
+      "name": "Room 4",
+      "polygonPoints": [
+        496.84614475119054,
+        257.3019642506753,
+        739.8482691156511,
+        257.3019642506753,
+        739.8482691156511,
+        395.8091770916104,
+        496.84614475119054,
+        395.8091770916104
+      ]
+    },
+    {
+      "id": "room-1774560553989-5",
+      "floorId": "floor-1774560533200-2",
+      "name": "Room 6",
+      "polygonPoints": [
+        332.5243792718642,
+        395.8091770916104,
+        493.8530930583225,
+        395.8091770916104,
+        493.8530930583225,
+        530.4159090764831,
+        332.5243792718642,
+        530.4159090764831
+      ]
+    },
+    {
+      "id": "room-1774560571889-7",
+      "floorId": "floor-1774560533200-2",
+      "name": "Room 8",
+      "polygonPoints": [
+        497.8465620293552,
+        396.45519423339556,
+        737.8966354090675,
+        396.45519423339556,
+        737.8966354090675,
+        528.1365655762213,
+        497.8465620293552,
+        528.1365655762213
+      ]
     }
   ],
   "pipes": [
@@ -241,6 +306,22 @@
         480.0,
         61.0
       ]
+    },
+    {
+      "id": "pipe-1774560598368-1",
+      "floorId": "floor-1774560533200-2",
+      "points": [
+        249.1039022629043,
+        507.74509543791214,
+        727.3033612254275,
+        513.742084754108,
+        728.3037785035917,
+        264.8670281319817,
+        343.1431264103461,
+        260.8690352545179,
+        343.1431264103461,
+        555.7210099674787
+      ]
     }
   ],
   "sensors": [
@@ -257,11 +338,11 @@
       "isWet": null,
       "value": null,
       "isOn": null,
-      "isOpen": false
+      "isOpen": true
     },
     {
       "id": "sensor-1774537149157-0",
-      "hardwareId": 598,
+      "hardwareId": 9,
       "type": "pump",
       "floorId": "floor-1774520226245-2",
       "roomId": null,
@@ -271,7 +352,7 @@
       "isMaster": null,
       "isWet": null,
       "value": null,
-      "isOn": false,
+      "isOn": true,
       "isOpen": null
     },
     {
@@ -300,7 +381,7 @@
       "y": 253.87559992320982,
       "isMaster": null,
       "isWet": null,
-      "value": 50.0,
+      "value": 0.0,
       "isOn": null,
       "isOpen": null
     },
@@ -315,7 +396,7 @@
       "y": 260.23295629948973,
       "isMaster": null,
       "isWet": null,
-      "value": 50.0,
+      "value": 0.0,
       "isOn": null,
       "isOpen": null
     },
@@ -362,7 +443,7 @@
       "isWet": null,
       "value": null,
       "isOn": null,
-      "isOpen": false
+      "isOpen": true
     },
     {
       "id": "sensor-1774537283113-0",
@@ -375,7 +456,7 @@
       "y": 379.6189069423929,
       "isMaster": null,
       "isWet": null,
-      "value": 50.0,
+      "value": 0.0,
       "isOn": null,
       "isOpen": null
     },
@@ -391,7 +472,7 @@
       "isMaster": null,
       "isWet": null,
       "value": null,
-      "isOn": false,
+      "isOn": true,
       "isOpen": null
     },
     {
@@ -407,11 +488,11 @@
       "isWet": null,
       "value": null,
       "isOn": null,
-      "isOpen": false
+      "isOpen": true
     },
     {
       "id": "sensor-1774537315377-0",
-      "hardwareId": 1,
+      "hardwareId": 14,
       "type": "water_drop",
       "floorId": "floor-1774520226245-2",
       "roomId": "room-1774534444650-3",
@@ -437,7 +518,7 @@
       "isWet": null,
       "value": null,
       "isOn": null,
-      "isOpen": false
+      "isOpen": true
     },
     {
       "id": "sensor-1774537958198-0",
@@ -465,7 +546,7 @@
       "y": 106.31039252983561,
       "isMaster": null,
       "isWet": null,
-      "value": 50.0,
+      "value": 0.0,
       "isOn": null,
       "isOpen": null
     },
@@ -513,6 +594,66 @@
       "value": null,
       "isOn": null,
       "isOpen": null
+    },
+    {
+      "id": "sensor-1774560602050-0",
+      "hardwareId": 9,
+      "type": "pump",
+      "floorId": "floor-1774560533200-2",
+      "roomId": null,
+      "pipeId": "pipe-1774560598368-1",
+      "x": 259.0689044084823,
+      "y": 507.87006423551924,
+      "isMaster": null,
+      "isWet": null,
+      "value": null,
+      "isOn": true,
+      "isOpen": null
+    },
+    {
+      "id": "sensor-1774560677013-0",
+      "hardwareId": 803,
+      "type": "master_flow",
+      "floorId": "floor-1774560533200-2",
+      "roomId": "room-1774560571889-7",
+      "pipeId": "pipe-1774560598368-1",
+      "x": 505.20805117250427,
+      "y": 510.9568386050341,
+      "isMaster": null,
+      "isWet": null,
+      "value": 0.0,
+      "isOn": null,
+      "isOpen": null
+    },
+    {
+      "id": "sensor-1774560684374-0",
+      "hardwareId": 1,
+      "type": "water_drop",
+      "floorId": "floor-1774560533200-2",
+      "roomId": "room-1774560545358-3",
+      "pipeId": "pipe-1774560598368-1",
+      "x": 727.9983705322071,
+      "y": 340.84375087579554,
+      "isMaster": null,
+      "isWet": false,
+      "value": null,
+      "isOn": null,
+      "isOpen": null
+    },
+    {
+      "id": "sensor-1774560691878-0",
+      "hardwareId": 569,
+      "type": "valve",
+      "floorId": "floor-1774560533200-2",
+      "roomId": "room-1774560571889-7",
+      "pipeId": "pipe-1774560598368-1",
+      "x": 726.2905687530044,
+      "y": 513.7293835568925,
+      "isMaster": null,
+      "isWet": null,
+      "value": null,
+      "isOn": null,
+      "isOpen": false
     }
   ]
 }

@@ -8,6 +8,7 @@ import uvicorn
 import json
 from typing import List, Dict, Optional, Set
 import os
+import httpx
 
 app = FastAPI()
 
@@ -183,7 +184,75 @@ async def receive_sensor_data(data: SensorData):
         }
     }))
 
+    # Phase 12: Automated Physical Pump Control (Floor-specific)
+    await sync_physical_pump_for_sensor(data.node_id)
+
     return {"status": "success", "data": data}
+
+async def sync_physical_pump_for_sensor(node_id: int):
+    """
+    Check if the triggered sensor belongs to a floor that has the designated physical pump (ID 9).
+    If so, toggle the physical pump based on any alarms on that floor.
+    """
+    # 1. Find the floor for this node_id
+    target_floor_id = None
+    for s in global_layout.get("sensors", []):
+        if s.get("hardwareId") == node_id:
+            target_floor_id = s.get("floorId")
+            break
+    
+    if not target_floor_id:
+        return
+
+    # 2. Check if a pump with ID 9 exists on THIS floor
+    pump_9 = None
+    for s in global_layout.get("sensors", []):
+        if s.get("type") == "pump" and s.get("hardwareId") == 9 and s.get("floorId") == target_floor_id:
+            pump_9 = s
+            break
+    
+    if not pump_9:
+        # User requested same floor logic. If pump 9 isn't here, do nothing.
+        return
+
+    # 3. Check for ANY water alarms on this specific floor
+    # We need to map global_layout sensors to their current state in sensor_states
+    floor_sensors = [s for s in global_layout.get("sensors", []) if s.get("floorId") == target_floor_id]
+    has_alarm_on_floor = False
+    for s in floor_sensors:
+        hw_id = s.get("hardwareId")
+        if hw_id in sensor_states and sensor_states[hw_id] == True:
+            # Check if it's a water detection sensor
+            if s.get("type") in ["water_drop", "humidity"]:
+                has_alarm_on_floor = True
+                break
+    
+    # 4. Trigger the physical pump via HTTP
+    target_state = "off" if has_alarm_on_floor else "on"
+    url = f"http://pump.local/api/pump/{target_state}"
+    
+    print(f"[Automated Control] Floor {target_floor_id} alarm status: {has_alarm_on_floor}. Sending {target_state} to pump.local...")
+    
+    try:
+        async with httpx.AsyncClient() as client:
+            # We use a short timeout as mDNS can sometimes be flaky
+            response = await client.get(url, timeout=2.0)
+            if response.status_code == 200:
+                print(f"[Automated Control] Successfully set pump to {target_state}")
+                
+                # 5. Broadcast the updated pump status to the frontend
+                await manager.broadcast(json.dumps({
+                    "type": "sensor_update",
+                    "data": {
+                        "node_id": 9,
+                        "isOn": (target_state == "on"),
+                        "timestamp": datetime.now().strftime("%H:%M:%S")
+                    }
+                }))
+            else:
+                print(f"[Automated Control] Pump returned error: {response.status_code}")
+    except Exception as e:
+        print(f"[Automated Control] Failed to reach pump.local: {e}")
 
 @app.get("/api/state")
 async def get_state():

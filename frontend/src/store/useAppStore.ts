@@ -132,7 +132,7 @@ interface AppState {
   clearFloor: (floorId: string) => void;
 
   // Backend Sync
-  syncSensorState: (hardwareId: number, isWet: boolean) => void;
+  syncSensorState: (hardwareId: number, isWet?: boolean, isOn?: boolean) => void;
   setFullLayout: (layout: { floors: Floor[]; rooms: Room[]; pipes: Pipe[]; sensors: Sensor[] }) => void;
 }
 
@@ -451,21 +451,30 @@ export const useAppStore = create<AppState>()(
   },
   // ── Backend Sync ───────────────────────────────────────────────
   
-  syncSensorState: (hardwareId: number, isWet: boolean) =>
+  syncSensorState: (hardwareId: number, isWet?: boolean, isOn?: boolean) =>
     set((state) => {
       // Only sync for hardwareIds 1-10
       if (hardwareId < 1 || hardwareId > 10) return state;
 
       const updatedSensors = state.sensors.map((s) => {
-        if (s.hardwareId === hardwareId && (s.type === 'water_drop' || s.type === 'humidity')) {
-          if (s.isWet === isWet) return s;
-          console.log(`[Backend Sync] Sensor ${hardwareId} is now ${isWet ? 'WET' : 'DRY'}`);
-          return { ...s, isWet };
+        if (s.hardwareId === hardwareId) {
+          // Handle water sensors
+          if ((s.type === 'water_drop' || s.type === 'humidity') && isWet !== undefined) {
+             if (s.isWet === isWet) return s;
+             console.log(`[Backend Sync] Sensor ${hardwareId} is now ${isWet ? 'WET' : 'DRY'}`);
+             return { ...s, isWet };
+          }
+          // Handle pump sensors (specifically ID 9)
+          if (s.type === 'pump' && isOn !== undefined) {
+            if (s.isOn === isOn) return s;
+            console.log(`[Backend Sync] Pump ${hardwareId} is now ${isOn ? 'ON' : 'OFF'}`);
+            return { ...s, isOn };
+          }
         }
         return s;
       });
 
-      // Handle mitigation if this sensor just went WET
+      // Handle local mitigation if this sensor just went WET (legacy logic, keep for responsiveness)
       if (isWet) {
         return {
           sensors: updatedSensors.map((s) => {
