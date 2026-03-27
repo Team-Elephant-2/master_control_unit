@@ -132,7 +132,7 @@ interface AppState {
   clearFloor: (floorId: string) => void;
 
   // Backend Sync
-  syncSensorState: (hardwareId: number, isWet?: boolean, isOn?: boolean) => void;
+  syncSensorState: (hardwareId: number, isWet?: boolean, isOn?: boolean, isOpen?: boolean) => void;
   setFullLayout: (layout: { floors: Floor[]; rooms: Room[]; pipes: Pipe[]; sensors: Sensor[] }) => void;
 }
 
@@ -451,7 +451,7 @@ export const useAppStore = create<AppState>()(
   },
   // ── Backend Sync ───────────────────────────────────────────────
   
-  syncSensorState: (hardwareId: number, isWet?: boolean, isOn?: boolean) =>
+  syncSensorState: (hardwareId: number, isWet?: boolean, isOn?: boolean, isOpen?: boolean) =>
     set((state) => {
       // Only sync for hardwareIds 1-10
       if (hardwareId < 1 || hardwareId > 10) return state;
@@ -464,11 +464,17 @@ export const useAppStore = create<AppState>()(
              console.log(`[Backend Sync] Sensor ${hardwareId} is now ${isWet ? 'WET' : 'DRY'}`);
              return { ...s, isWet };
           }
-          // Handle pump sensors (specifically ID 9)
+          // Handle pump sensors
           if (s.type === 'pump' && isOn !== undefined) {
             if (s.isOn === isOn) return s;
             console.log(`[Backend Sync] Pump ${hardwareId} is now ${isOn ? 'ON' : 'OFF'}`);
             return { ...s, isOn };
+          }
+          // Handle valve sensors
+          if (s.type === 'valve' && isOpen !== undefined) {
+            if (s.isOpen === isOpen) return s;
+            console.log(`[Backend Sync] Valve ${hardwareId} is now ${isOpen ? 'OPEN' : 'CLOSED'}`);
+            return { ...s, isOpen };
           }
         }
         return s;

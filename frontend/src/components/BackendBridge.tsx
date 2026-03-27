@@ -57,14 +57,17 @@ export default function BackendBridge() {
             syncSensorState(Number(id), isWet as boolean);
           });
         } else if (message.type === 'sensor_update') {
-          const { node_id, is_wet, isOn } = message.data;
+          const { node_id, is_wet, isOn, isOpen } = message.data;
           if (is_wet !== undefined) {
             console.log(`[BackendBridge] Sensor Update: Node ${node_id} is ${is_wet ? 'WET' : 'DRY'}`);
           }
           if (isOn !== undefined) {
             console.log(`[BackendBridge] Pump Update: Node ${node_id} is ${isOn ? 'ON' : 'OFF'}`);
           }
-          syncSensorState(Number(node_id), is_wet, isOn);
+          if (isOpen !== undefined) {
+            console.log(`[BackendBridge] Valve Update: Node ${node_id} is ${isOpen ? 'OPEN' : 'CLOSED'}`);
+          }
+          syncSensorState(Number(node_id), is_wet, isOn, isOpen);
         }
  else if (message.type === 'layout_update') {
           const now = Date.now();
