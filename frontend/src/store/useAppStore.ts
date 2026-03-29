@@ -19,12 +19,14 @@ export type SensorData =
 // ── Canvas Mode ─────────────────────────────────────────────────────
 
 export type CanvasMode = 'select' | 'add_room' | 'draw_pipe' | 'add_sensor';
+export type ViewMode = 'floor' | 'building_overview';
 
 // ── Entity Types ────────────────────────────────────────────────────
 
 export interface Floor {
   id: string;
   name: string;
+  blueprintUrl?: string; // Phase 10: Blueprint Background Image DataURL
 }
 
 export interface Room {
@@ -48,6 +50,7 @@ export interface Sensor {
   type: SensorType;
   floorId: string;
   roomId: string | null;
+  pipeId?: string | null;
   x: number;
   y: number;
   isMaster?: boolean;
@@ -61,31 +64,45 @@ export interface Sensor {
 // ── Store Shape ─────────────────────────────────────────────────────
 
 interface AppState {
-  // Data
+  // ── State ────────────────────────────────────────────────────────
   floors: Floor[];
   rooms: Room[];
   pipes: Pipe[];
   sensors: Sensor[];
+  
   activeFloorId: string | null;
-
-  // Canvas state
+  viewMode: ViewMode;
   canvasMode: CanvasMode;
   selectedId: string | null;
-  drawingPipePoints: number[];
-  selectedSensorType: SensorType;
   focusedRoomId: string | null;
+  drawingPipePoints: number[];
+  selectedSensorType: SensorType | null;
 
-  // Floor actions
+  // Phase 10: Tracing Mode
+  tracingMode: boolean;
+
+  // Phase 11: Navigation
+  stageX: number;
+  stageY: number;
+  stageScale: number;
+
+  // ── Actions ──────────────────────────────────────────────────────
+  // Floors
+  setActiveFloor: (id: string) => void;
+  setViewMode: (mode: ViewMode) => void;
   addFloor: (name: string) => void;
   removeFloor: (id: string) => void;
-  setActiveFloor: (id: string) => void;
+  setFloorBlueprint: (floorId: string, url: string) => void;
 
-  // Canvas actions
+  // Mode
   setCanvasMode: (mode: CanvasMode) => void;
   setSelectedId: (id: string | null) => void;
-  deleteEntity: (id: string) => void;
-  setSelectedSensorType: (type: SensorType) => void;
   setFocusedRoomId: (id: string | null) => void;
+  setSelectedSensorType: (type: SensorType | null) => void;
+  toggleTracingMode: () => void;
+  deleteEntity: (id: string) => void;
+  setStagePosition: (x: number, y: number) => void;
+  setStageScale: (scale: number) => void;
 
   // Room actions
   addRoom: (floorId: string, x: number, y: number) => void;
@@ -100,7 +117,7 @@ interface AppState {
 
   // Sensor actions
   addSensor: (sensor: Omit<Sensor, 'id'>) => void;
-  updateSensorPosition: (id: string, x: number, y: number, roomId: string | null) => void;
+  updateSensorPosition: (id: string, x: number, y: number, roomId: string | null, pipeId: string | null) => void;
   updateSensorHardwareId: (id: string, hardwareId: number) => void;
   setMasterSensor: (sensorId: string, floorId: string) => void;
 
@@ -110,6 +127,13 @@ interface AppState {
   togglePump: (sensorId: string) => void;
   toggleValve: (sensorId: string) => void;
   resetSimulation: () => void;
+
+  // Phase 8 Utilities
+  clearFloor: (floorId: string) => void;
+
+  // Backend Sync
+  syncSensorState: (hardwareId: number, isWet?: boolean, isOn?: boolean, isOpen?: boolean) => void;
+  setFullLayout: (layout: { floors: Floor[]; rooms: Room[]; pipes: Pipe[]; sensors: Sensor[] }) => void;
 }
 
 // ── Helpers ─────────────────────────────────────────────────────────
@@ -135,19 +159,23 @@ const DEFAULT_FLOOR: Floor = { id: 'floor-1', name: 'Floor 1' };
 // ── Store ───────────────────────────────────────────────────────────
 
 export const useAppStore = create<AppState>()(
-  persist(
-    (set) => ({
-      floors: [DEFAULT_FLOOR],
-      rooms: [],
-      pipes: [],
-      sensors: [],
+  (set) => ({
+    floors: [DEFAULT_FLOOR],
+    rooms: [],
+    pipes: [],
+    sensors: [],
       activeFloorId: DEFAULT_FLOOR.id,
+      viewMode: 'floor',
 
   canvasMode: 'select',
   selectedId: null,
-  drawingPipePoints: [],
-  selectedSensorType: 'master_flow',
   focusedRoomId: null,
+  drawingPipePoints: [],
+  selectedSensorType: null,
+  tracingMode: false,
+  stageX: 0,
+  stageY: 0,
+  stageScale: 1,
 
   // ── Floor actions ───────────────────────────────────────────────
 
@@ -157,15 +185,40 @@ export const useAppStore = create<AppState>()(
   },
 
   removeFloor: (id: string) =>
-    set((state) => ({
-      floors: state.floors.filter((f) => f.id !== id),
-      activeFloorId:
-        state.activeFloorId === id
-          ? state.floors[0]?.id ?? null
-          : state.activeFloorId,
-    })),
+    set((state) => {
+      const floorIndex = state.floors.findIndex((f) => f.id === id);
+      if (floorIndex === -1) return state;
 
-  setActiveFloor: (id: string) => set({ activeFloorId: id }),
+      const remainingFloors = state.floors.filter((f) => f.id !== id);
+      
+      // Phase 12: Renumber remaining floors so they are always in order
+      const renamedFloors = remainingFloors.map((f, i) => ({
+        ...f,
+        name: `Floor ${i + 1}`
+      }));
+
+      const nextActiveId =
+        state.activeFloorId === id
+          ? (renamedFloors[0]?.id ?? null)
+          : state.activeFloorId;
+
+      return {
+        floors: renamedFloors,
+        activeFloorId: nextActiveId,
+        rooms: state.rooms.filter((r) => r.floorId !== id),
+        pipes: state.pipes.filter((p) => p.floorId !== id),
+        sensors: state.sensors.filter((s) => s.floorId !== id),
+        selectedId: null,
+        focusedRoomId: null,
+        stageX: 0,
+        stageY: 0,
+        stageScale: 1
+      };
+    }),
+
+  setActiveFloor: (id: string) => set({ activeFloorId: id, viewMode: 'floor' }),
+
+  setViewMode: (mode: ViewMode) => set({ viewMode: mode }),
 
   // ── Canvas actions ──────────────────────────────────────────────
 
@@ -184,18 +237,26 @@ export const useAppStore = create<AppState>()(
 
   setSelectedId: (id: string | null) => set({ selectedId: id }),
 
-  deleteEntity: (id: string) =>
-    set((state) => ({
+  deleteEntity: (id: string) => set((state) => {
+    // If it's a pipe, also delete sensors on that pipe
+    const isPipe = state.pipes.some(p => p.id === id);
+    return {
       rooms: state.rooms.filter((r) => r.id !== id),
       pipes: state.pipes.filter((p) => p.id !== id),
-      sensors: state.sensors.filter((s) => s.id !== id),
+      sensors: state.sensors.filter((s) => s.id !== id && (!isPipe || s.pipeId !== id)),
       selectedId: state.selectedId === id ? null : state.selectedId,
       focusedRoomId: state.focusedRoomId === id ? null : state.focusedRoomId,
-    })),
+    };
+  }),
 
-  setSelectedSensorType: (type: SensorType) => set({ selectedSensorType: type }),
+  setSelectedSensorType: (type: SensorType | null) => set({ selectedSensorType: type, canvasMode: type ? 'add_sensor' : 'select' }),
 
   setFocusedRoomId: (id: string | null) => set({ focusedRoomId: id }),
+
+  // ── Phase 11 Navigation ─────────────────────────────────────────
+
+  setStagePosition: (x: number, y: number) => set({ stageX: x, stageY: y }),
+  setStageScale: (scale: number) => set({ stageScale: scale }),
 
   // ── Room actions ────────────────────────────────────────────────
 
@@ -268,10 +329,10 @@ export const useAppStore = create<AppState>()(
     }));
   },
 
-  updateSensorPosition: (id: string, x: number, y: number, roomId: string | null) =>
+  updateSensorPosition: (id: string, x: number, y: number, roomId: string | null, pipeId: string | null) =>
     set((state) => ({
       sensors: state.sensors.map((s) =>
-        s.id === id ? { ...s, x, y, roomId } : s
+        s.id === id ? { ...s, x, y, roomId, pipeId } : s
       ),
     })),
 
@@ -299,6 +360,18 @@ export const useAppStore = create<AppState>()(
     const target = state.sensors.find((s) => s.id === sensorId);
     if (!target) return state;
 
+    // Phase 12: Backend Integration
+    // Tell the backend about the leak. The backend will broadcast this
+    // to all connected clients (including us) via WebSockets.
+    fetch('/api/sensor', {
+      method: 'POST',
+      headers: { 
+        'Content-Type': 'application/json',
+        'ngrok-skip-browser-warning': 'true'
+      },
+      body: JSON.stringify({ node_id: target.hardwareId, is_wet: true })
+    }).catch(err => console.error('[Simulator] Failed to notify backend of leak:', err));
+
     return {
       sensors: state.sensors.map((s) => {
         if (s.id === sensorId) return { ...s, isWet: true };
@@ -324,23 +397,118 @@ export const useAppStore = create<AppState>()(
     sensors: state.sensors.map((s) => s.id === sensorId ? { ...s, isOpen: !s.isOpen } : s),
   })),
 
-  resetSimulation: () => set((state) => ({
-    sensors: state.sensors.map((s) => {
-      let overrides = {};
-      if (s.type === 'water_drop' || s.type === 'humidity') overrides = { isWet: false };
-      if (s.type === 'master_flow') overrides = { value: 0 };
-      if (s.type === 'pump') overrides = { isOn: true };
-      if (s.type === 'valve') overrides = { isOpen: true };
-      return { ...s, ...overrides };
-    })
-  })),
-}), { name: 'tms-storage' }));
+  resetSimulation: () => set((state) => {
+    // Reset backend sensor state if possible
+    state.sensors.forEach(s => {
+      if (s.type === 'water_drop' || s.type === 'humidity') {
+        fetch('/api/sensor', {
+          method: 'POST',
+          headers: { 
+            'Content-Type': 'application/json',
+            'ngrok-skip-browser-warning': 'true'
+          },
+          body: JSON.stringify({ node_id: s.hardwareId, is_wet: false })
+        }).catch(() => {});
+      }
+    });
 
-// Cross-tab synchronization
-if (typeof window !== 'undefined') {
-  window.addEventListener('storage', (e) => {
-    if (e.key === 'tms-storage') {
-      useAppStore.persist.rehydrate();
-    }
-  });
-}
+    return {
+      sensors: state.sensors.map((s) => {
+        let overrides = {};
+        if (s.type === 'water_drop' || s.type === 'humidity') overrides = { isWet: false };
+        if (s.type === 'master_flow') overrides = { value: 0 };
+        if (s.type === 'pump') overrides = { isOn: true };
+        if (s.type === 'valve') overrides = { isOpen: true };
+        return { ...s, ...overrides };
+      })
+    };
+  }),
+
+  // ── Phase 10 Blueprint Tracing ──────────────────────────────────
+
+  setFloorBlueprint: (floorId: string, url: string) => set((state) => ({
+    floors: state.floors.map(f => f.id === floorId ? { ...f, blueprintUrl: url } : f)
+  })),
+
+  toggleTracingMode: () => set((state) => ({ tracingMode: !state.tracingMode })),
+
+  // ── Phase 8 Utilities ───────────────────────────────────────────
+
+  clearFloor: (floorId: string) => {
+    console.log(`[useAppStore] Clearing floor: ${floorId}`);
+    set((state) => ({
+      rooms: state.rooms.filter(r => r.floorId !== floorId),
+      pipes: state.pipes.filter(p => p.floorId !== floorId),
+      sensors: state.sensors.filter(s => s.floorId !== floorId),
+      floors: state.floors.map(f => f.id === floorId ? { ...f, blueprintUrl: undefined } : f),
+      selectedId: null,
+      focusedRoomId: null,
+      canvasMode: 'select',
+      stageX: 0,
+      stageY: 0,
+      stageScale: 1
+    }));
+  },
+  // ── Backend Sync ───────────────────────────────────────────────
+  
+  syncSensorState: (hardwareId: number, isWet?: boolean, isOn?: boolean, isOpen?: boolean) =>
+    set((state) => {
+      // Only sync for hardwareIds 1-10
+      if (hardwareId < 1 || hardwareId > 10) return state;
+
+      const updatedSensors = state.sensors.map((s) => {
+        if (s.hardwareId === hardwareId) {
+          // Handle water sensors
+          if ((s.type === 'water_drop' || s.type === 'humidity') && isWet !== undefined) {
+             if (s.isWet === isWet) return s;
+             console.log(`[Backend Sync] Sensor ${hardwareId} is now ${isWet ? 'WET' : 'DRY'}`);
+             return { ...s, isWet };
+          }
+          // Handle pump sensors
+          if (s.type === 'pump' && isOn !== undefined) {
+            if (s.isOn === isOn) return s;
+            console.log(`[Backend Sync] Pump ${hardwareId} is now ${isOn ? 'ON' : 'OFF'}`);
+            return { ...s, isOn };
+          }
+          // Handle valve sensors
+          if (s.type === 'valve' && isOpen !== undefined) {
+            if (s.isOpen === isOpen) return s;
+            console.log(`[Backend Sync] Valve ${hardwareId} is now ${isOpen ? 'OPEN' : 'CLOSED'}`);
+            return { ...s, isOpen };
+          }
+        }
+        return s;
+      });
+
+      // Handle local mitigation if this sensor just went WET (legacy logic, keep for responsiveness)
+      if (isWet) {
+        return {
+          sensors: updatedSensors.map((s) => {
+            const triggeringSensor = updatedSensors.find(ts => ts.hardwareId === hardwareId && ts.isWet);
+            if (triggeringSensor && s.floorId === triggeringSensor.floorId) {
+              if (s.type === 'pump') return { ...s, isOn: false };
+              if (s.type === 'valve') return { ...s, isOpen: false };
+            }
+            return s;
+          })
+        };
+      }
+
+      return { sensors: updatedSensors };
+    }),
+
+  setFullLayout: (layout) => set((state) => ({
+    ...state,
+    floors: layout.floors || state.floors,
+    rooms: layout.rooms || state.rooms,
+    pipes: layout.pipes || state.pipes,
+    sensors: layout.sensors || state.sensors,
+    // If active floor no longer exists, reset to the first available floor
+    activeFloorId: (layout.floors && !layout.floors.find(f => f.id === state.activeFloorId)) 
+      ? (layout.floors[0]?.id ?? null) 
+      : state.activeFloorId,
+  })),
+}),);
+
+// Remove cross-tab synchronization logic as we'll use WebSockets instead
+

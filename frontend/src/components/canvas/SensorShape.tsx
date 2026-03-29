@@ -105,6 +105,26 @@ export default function SensorShape({ sensor, opacity = 1, onHoverIn, onHoverOut
     };
   }, [isLeaking]);
 
+  const isShutoff = (sensor.type === 'pump' && !sensor.isOn) || (sensor.type === 'valve' && !sensor.isOpen);
+
+  const shutoffBadgeRef = useRef<any>(null);
+
+  useEffect(() => {
+    let anim: Konva.Animation;
+    if (isShutoff && shutoffBadgeRef.current) {
+      anim = new Konva.Animation((frame) => {
+        if (!frame) return;
+        const period = 800;
+        const scale = 1 + Math.abs(Math.sin((frame.time * 2 * Math.PI) / period)) * 0.15;
+        shutoffBadgeRef.current.radius(6 * scale);
+      }, shutoffBadgeRef.current.getLayer());
+      anim.start();
+    }
+    return () => {
+      if (anim) anim.stop();
+    };
+  }, [isShutoff]);
+
   // ── Handlers ──────────────────────────────────────────────────────
 
   const handleClick = (e: KonvaEventObject<MouseEvent>) => {
@@ -114,20 +134,35 @@ export default function SensorShape({ sensor, opacity = 1, onHoverIn, onHoverOut
   };
 
   const dragBoundFunc = (pos: { x: number; y: number }) => {
+    const stage = circleRef.current?.getStage();
+    if (!stage) return pos;
+
+    const transform = stage.getAbsoluteTransform().copy().invert();
+    const stagePos = transform.point(pos);
+
     const floorPipes = pipes.filter((p) => p.floorId === activeFloorId);
-    const closest = getClosestPointOnPipes(pos.x, pos.y, floorPipes);
-    if (closest) return { x: closest.x, y: closest.y };
+    const closest = getClosestPointOnPipes(stagePos.x, stagePos.y, floorPipes);
+    
+    if (closest) {
+      return stage.getAbsoluteTransform().point({ x: closest.x, y: closest.y });
+    }
     return pos;
   };
 
   const handleDragEnd = (e: KonvaEventObject<DragEvent>) => {
     e.cancelBubble = true;
     const node = e.target;
+    // node.x/y are already in local stage coordinates
     const newX = node.x();
     const newY = node.y();
+    
+    const floorPipes = pipes.filter((p) => p.floorId === activeFloorId);
+    const closest = getClosestPointOnPipes(newX, newY, floorPipes);
+    const pipeId = closest ? closest.pipeId : null;
+
     const floorRooms = rooms.filter((r) => r.floorId === activeFloorId);
     const newRoomId = findRoomForPoint(newX, newY, floorRooms);
-    updateSensorPosition(sensor.id, newX, newY, newRoomId);
+    updateSensorPosition(sensor.id, newX, newY, newRoomId, pipeId);
   };
 
   return (
@@ -148,13 +183,9 @@ export default function SensorShape({ sensor, opacity = 1, onHoverIn, onHoverOut
         
         if (onHoverIn) {
            const stage = e.target.getStage();
-           if (stage) {
-             const pos = stage.getPointerPosition();
-             if (pos) {
-                const absTransform = stage.getAbsoluteTransform();
-                const screenPos = { x: pos.x * absTransform.m[0] + absTransform.m[4], y: pos.y * absTransform.m[3] + absTransform.m[5] };
-                onHoverIn(screenPos.x, screenPos.y - 10);
-             }
+           const pos = stage?.getPointerPosition();
+           if (pos) {
+              onHoverIn(pos.x, pos.y - 10);
            }
         }
       }}
@@ -166,13 +197,9 @@ export default function SensorShape({ sensor, opacity = 1, onHoverIn, onHoverOut
       onMouseMove={(e) => {
          if (onHoverIn) {
             const stage = e.target.getStage();
-            if (stage) {
-               const pos = stage.getPointerPosition();
-               if (pos) {
-                 const absTransform = stage.getAbsoluteTransform();
-                 const screenPos = { x: pos.x * absTransform.m[0] + absTransform.m[4], y: pos.y * absTransform.m[3] + absTransform.m[5] };
-                 onHoverIn(screenPos.x, screenPos.y - 10);
-               }
+            const pos = stage?.getPointerPosition();
+            if (pos) {
+               onHoverIn(pos.x, pos.y - 10);
             }
          }
       }}
@@ -230,6 +257,30 @@ export default function SensorShape({ sensor, opacity = 1, onHoverIn, onHoverOut
         listening={false}
       />
       
+      {/* Shutoff Warning Badge overlaid on top right of the sensor node */}
+      {isShutoff && (
+        <Group x={16} y={-16}>
+          <Circle
+            ref={shutoffBadgeRef}
+            radius={6}
+            fill="#ef4444"
+            shadowColor="#ef4444"
+            shadowBlur={4}
+            shadowOpacity={0.8}
+          />
+          <Text
+            text="!"
+            fill="#ffffff"
+            fontSize={10}
+            fontStyle="bold"
+            align="center"
+            verticalAlign="middle"
+            offsetX={3}
+            offsetY={5}
+          />
+        </Group>
+      )}
+      
       {/* Bottom Label (ID) */}
       <Text
         text={`ID: ${sensor.hardwareId}`}
@@ -241,6 +292,22 @@ export default function SensorShape({ sensor, opacity = 1, onHoverIn, onHoverOut
         align="center"
         width={80}
       />
+
+      {/* Warning Text for Shutoff */}
+      {isShutoff && (
+        <Text
+          text="SHUTOFF ACTIVE"
+          x={-40}
+          y={42}
+          fontSize={9}
+          fontStyle="bold"
+          fontFamily="Inter, sans-serif"
+          fill="#ef4444"
+          align="center"
+          width={80}
+          letterSpacing={0.5}
+        />
+      )}
     </Group>
   );
 }

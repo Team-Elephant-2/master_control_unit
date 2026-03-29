@@ -35,6 +35,9 @@ export default function RightSidebar() {
   const setSelectedSensorType = useAppStore((s) => s.setSelectedSensorType);
   const focusedRoomId = useAppStore((s) => s.focusedRoomId);
   const activeFloorId = useAppStore((s) => s.activeFloorId);
+  const viewMode = useAppStore((s) => s.viewMode);
+
+  if (viewMode === 'building_overview') return null;
 
   // Find if a room or sensor is selected
   const selectedRoom = rooms.find((r) => r.id === selectedId);
@@ -45,11 +48,11 @@ export default function RightSidebar() {
   const zoneSensors = focusedRoomId ? sensors.filter(s => s.roomId === focusedRoomId) : [];
 
   return (
-    <aside className="fixed right-0 top-14 bottom-0 z-40 flex w-72 flex-col border-l border-slate-200 bg-white">
+    <aside className="fixed right-0 top-14 bottom-0 z-40 flex w-[320px] flex-col border-l border-slate-200 bg-white shadow-sm shadow-slate-200/50">
       {/* Heading */}
-      <div className="flex items-center gap-2 px-4 py-3.5 border-b border-slate-100">
-        <Info className="h-4 w-4 text-slate-400" />
-        <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+      <div className="flex items-center gap-2 px-5 py-3.5 border-b border-slate-100 bg-slate-50/50">
+        <Info className="h-5 w-5 text-slate-400" />
+        <span className="text-sm font-bold uppercase tracking-wider text-slate-500">
           {focusedRoomId ? 'Zone Metrics' : canvasMode === 'add_sensor' ? 'Hardware Palette' : 'Details'}
         </span>
       </div>
@@ -57,14 +60,25 @@ export default function RightSidebar() {
       {/* Content */}
       <div className="flex-1 overflow-y-auto">
         {focusedRoomId && focusedRoom ? (
-           <div className="p-4 space-y-4">
+           <div className="p-5 space-y-6">
+             {/* Editable Room Title Header */}
              <div>
-               <h2 className="text-lg font-bold text-slate-800 tracking-tight">{focusedRoom.name}</h2>
-               <p className="text-xs text-slate-500 mt-1">Live Sensor Telemetry</p>
+               <label className="flex items-center gap-1.5 text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">
+                 <Edit2 className="h-3.5 w-3.5" />
+                 Room Name
+               </label>
+               <input
+                 type="text"
+                 value={focusedRoom.name}
+                 onChange={(e) => renameRoom(focusedRoom.id, e.target.value)}
+                 className="w-full rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-lg font-bold text-slate-800 focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-1 focus:ring-blue-500 transition-all"
+                 placeholder="Enter room name..."
+               />
+               <p className="text-sm text-slate-500 mt-3 font-medium">Live Sensor Telemetry</p>
              </div>
              
              {zoneSensors.length === 0 ? (
-               <div className="rounded-lg border border-dashed border-slate-300 p-6 text-center text-sm text-slate-400">
+               <div className="rounded-lg border border-dashed border-slate-300 p-8 text-center text-sm font-medium text-slate-400 bg-slate-50/50">
                  No hardware mapped to this zone.
                </div>
              ) : (
@@ -73,17 +87,17 @@ export default function RightSidebar() {
                    const conf = SENSOR_TYPES.find(t => t.type === s.type);
                    const Icon = conf?.Icon || Cpu;
                    return (
-                     <div key={s.id} className="flex items-center justify-between p-3 rounded-lg border border-slate-100 bg-slate-50 shadow-sm">
-                       <div className="flex items-center gap-3">
-                         <div className="p-1.5 rounded bg-white shadow-sm text-indigo-500">
-                           <Icon className="h-4 w-4" />
+                     <div key={s.id} className="flex items-center justify-between p-3.5 rounded-xl border border-slate-200 bg-white shadow-sm hover:shadow-md transition-shadow">
+                       <div className="flex items-center gap-4">
+                         <div className="p-2.5 rounded-lg bg-indigo-50 shadow-sm border border-indigo-100 text-indigo-600">
+                           <Icon className="h-5 w-5" />
                          </div>
-                         <div>
-                           <div className="text-xs font-bold text-slate-700">{conf?.label} ({s.hardwareId})</div>
-                           <div className="text-[10px] text-slate-500 uppercase tracking-wider">{getLiveReading(s)}</div>
+                         <div className="space-y-0.5">
+                           <div className="text-sm font-bold text-slate-800">{conf?.label} ({s.hardwareId})</div>
+                           <div className="text-xs font-bold text-slate-500 uppercase tracking-widest">{getLiveReading(s)}</div>
                          </div>
                        </div>
-                       {s.type === 'water_drop' && <CheckCircle className="h-4 w-4 text-emerald-500" />}
+                       {s.type === 'water_drop' && <CheckCircle className="h-5 w-5 text-emerald-500 drop-shadow-sm" />}
                      </div>
                    );
                  })}
@@ -91,64 +105,49 @@ export default function RightSidebar() {
              )}
            </div>
         ) : canvasMode === 'add_sensor' ? (
-          <div className="p-4 space-y-4">
-             <h2 className="text-sm font-semibold text-slate-800 tracking-tight">Select Hardware</h2>
-             <div className="flex flex-col gap-2">
+          <div className="p-5 space-y-5">
+             <h2 className="text-base font-bold text-slate-800 tracking-tight">Select Hardware</h2>
+             <div className="flex flex-col gap-2.5">
                {SENSOR_TYPES.map(({ type, label, Icon }) => (
                  <button
                    key={type}
                    onClick={() => setSelectedSensorType(type)}
-                   className={`flex items-center gap-3 px-3 py-2.5 rounded-lg border text-left transition-colors ${
+                   className={`flex items-center gap-3.5 px-4 py-3 rounded-xl border text-left transition-colors font-medium shadow-sm ${
                      selectedSensorType === type 
-                       ? 'bg-blue-50 border-blue-200 text-blue-700' 
+                       ? 'bg-blue-50 border-blue-200 text-blue-700 ring-1 ring-blue-500/50' 
                        : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
                    }`}
                  >
-                   <Icon className="h-4 w-4" />
-                   <span className="text-sm font-medium">{label}</span>
+                   <Icon className="h-5 w-5" />
+                   <span className="text-sm">{label}</span>
                  </button>
                ))}
              </div>
           </div>
         ) : selectedRoom ? (
-          <div className="p-4 space-y-6">
+          <div className="p-5 space-y-6">
             {/* Header */}
             <div>
-              <div className="flex items-center gap-2 text-blue-600 mb-1">
+              <div className="flex items-center gap-2 text-blue-600 mb-1.5">
                 <MapIcon className="h-4 w-4" />
-                <span className="text-xs font-bold uppercase tracking-tight">Room Entity</span>
+                <span className="text-xs font-black uppercase tracking-widest">Room Entity</span>
               </div>
-              <h2 className="text-lg font-semibold text-slate-800 tracking-tight">
+              <h2 className="text-xl font-bold text-slate-800 tracking-tight">
                 {selectedRoom.name}
               </h2>
             </div>
 
-            {/* Property: Name */}
-            <div className="space-y-1.5">
-              <label className="flex items-center gap-1.5 text-[11px] font-bold text-slate-400 uppercase tracking-wider">
-                <Edit2 className="h-3 w-3" />
-                Room Name
-              </label>
-              <input
-                type="text"
-                value={selectedRoom.name}
-                onChange={(e) => renameRoom(selectedRoom.id, e.target.value)}
-                className="w-full rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-1 focus:ring-blue-500 transition-all"
-                placeholder="Enter room name..."
-              />
-            </div>
-
             {/* Geometry Info */}
-            <div className="rounded-lg bg-slate-50 p-3 border border-slate-100">
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-2">Geometry</span>
-              <div className="grid grid-cols-2 gap-2 text-[11px]">
+            <div className="rounded-xl bg-slate-50 p-4 border border-slate-200 shadow-sm">
+              <span className="text-[11px] font-bold text-slate-400 uppercase tracking-widest block mb-2.5">Geometry</span>
+              <div className="grid grid-cols-2 gap-3 text-sm">
                  <div>
-                   <span className="text-slate-400 block">Vertices</span>
-                   <span className="text-slate-600 font-medium">{selectedRoom.polygonPoints.length / 2} points</span>
+                   <span className="text-slate-400 block font-medium text-xs uppercase mb-0.5">Vertices</span>
+                   <span className="text-slate-700 font-bold">{selectedRoom.polygonPoints.length / 2} points</span>
                  </div>
                  <div>
-                   <span className="text-slate-400 block">Status</span>
-                   <span className="text-blue-600 font-medium italic">Synchronized</span>
+                   <span className="text-slate-400 block font-medium text-xs uppercase mb-0.5">Status</span>
+                   <span className="text-blue-600 font-bold italic">Synchronized</span>
                  </div>
               </div>
             </div>

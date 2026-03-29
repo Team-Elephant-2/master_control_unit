@@ -1,9 +1,12 @@
+'use client';
+
 import React, { useRef, useEffect, useMemo } from 'react';
 import { Line, Circle, Text, Group, Transformer } from 'react-konva';
 import { useAppStore } from '@/store/useAppStore';
 import type { Room } from '@/store/useAppStore';
 import type { KonvaEventObject } from 'konva/lib/Node';
 import Konva from 'konva';
+import { getRelativePointerPosition } from '@/utils/geometry';
 
 interface RoomShapeProps {
   room: Room;
@@ -12,12 +15,13 @@ interface RoomShapeProps {
 
 const SNAP_DIST = 15;
 
-export default function RoomShape({ room, opacity = 1 }: RoomShapeProps) {
+export default function RoomShape({ room, opacity = 1 }: { room: Room, opacity?: number }) {
   const lineRef = useRef<any>(null);
   const trRef = useRef<any>(null);
 
+  const isSelected = useAppStore((s) => s.selectedId === room.id);
   const canvasMode = useAppStore((s) => s.canvasMode);
-  const selectedId = useAppStore((s) => s.selectedId);
+  const tracingMode = useAppStore((s) => s.tracingMode);
   const setSelectedId = useAppStore((s) => s.setSelectedId);
   const updateRoomPoints = useAppStore((s) => s.updateRoomPoints);
   const renameRoom = useAppStore((s) => s.renameRoom);
@@ -25,9 +29,8 @@ export default function RoomShape({ room, opacity = 1 }: RoomShapeProps) {
   const setFocusedRoomId = useAppStore((s) => s.setFocusedRoomId);
   const sensors = useAppStore((s) => s.sensors);
 
-  const isSelected = selectedId === room.id;
   const isLeaking = sensors.some((s) => s.roomId === room.id && s.type === 'water_drop' && s.isWet);
-  
+
   const pts = room.polygonPoints;
 
   // ── Transformer attachment ────────────────────────────────────────
@@ -43,7 +46,7 @@ export default function RoomShape({ room, opacity = 1 }: RoomShapeProps) {
 
   useEffect(() => {
     if (!lineRef.current) return;
-    
+
     if (!isLeaking) {
       lineRef.current.fill(isSelected ? '#e0f2fe' : '#f0f9ff');
       lineRef.current.stroke(isSelected ? '#38bdf8' : '#cbd5e1');
@@ -71,7 +74,7 @@ export default function RoomShape({ room, opacity = 1 }: RoomShapeProps) {
 
   // ── Helpers ──────────────────────────────────────────────────────
 
-  const otherRooms = useMemo(() => 
+  const otherRooms = useMemo(() =>
     allRooms.filter((r) => r.id !== room.id && r.floorId === room.floorId),
     [allRooms, room.id, room.floorId]
   );
@@ -101,13 +104,6 @@ export default function RoomShape({ room, opacity = 1 }: RoomShapeProps) {
 
   // ── Handlers ──────────────────────────────────────────────────────
 
-  const handleRename = () => {
-    const newName = window.prompt('Enter room name:', room.name);
-    if (newName && newName.trim()) {
-      renameRoom(room.id, newName.trim());
-    }
-  };
-
   const handleClick = (e: KonvaEventObject<MouseEvent>) => {
     if (canvasMode !== 'select') return;
     e.cancelBubble = true;
@@ -121,7 +117,7 @@ export default function RoomShape({ room, opacity = 1 }: RoomShapeProps) {
 
     const stage = e.target.getStage();
     if (!stage) return;
-    const pos = stage.getPointerPosition();
+    const pos = getRelativePointerPosition(stage);
     if (!pos) return;
 
     // Determine if we're near the border
@@ -145,15 +141,11 @@ export default function RoomShape({ room, opacity = 1 }: RoomShapeProps) {
     }
 
     if (minLineDist < 20) {
-      // Logic for adding point
       if (isSelected && bestInsertIndex !== -1) {
         const newPts = [...pts];
         newPts.splice(bestInsertIndex * 2, 0, pos.x, pos.y);
         updateRoomPoints(room.id, newPts);
       }
-    } else {
-      // Far from border -> rename
-      handleRename();
     }
   };
 
@@ -227,7 +219,7 @@ export default function RoomShape({ room, opacity = 1 }: RoomShapeProps) {
       name="room-group"
       draggable={canvasMode === 'select'}
       dragBoundFunc={groupDragBoundFunc}
-      opacity={opacity}
+      opacity={tracingMode ? 0.8 : opacity}
       onDragEnd={(e) => {
         if (e.target.name() === 'room-group') bakeTransform(e.target);
       }}
@@ -240,7 +232,7 @@ export default function RoomShape({ room, opacity = 1 }: RoomShapeProps) {
         ref={lineRef}
         points={pts}
         closed
-        fill={isSelected ? '#e0f2fe' : '#f0f9ff'}
+        fill={tracingMode ? 'transparent' : (isSelected ? '#e0f2fe' : '#f0f9ff')}
         stroke={isSelected ? '#38bdf8' : '#cbd5e1'}
         strokeWidth={isSelected ? 2 : 1.5}
         hitStrokeWidth={25}
@@ -289,12 +281,12 @@ export default function RoomShape({ room, opacity = 1 }: RoomShapeProps) {
               }}
               onDragEnd={(e) => (e.cancelBubble = true)}
               onMouseEnter={(e) => {
-                 const stage = e.target.getStage();
-                 if (stage) stage.container().style.cursor = 'grab';
+                const stage = e.target.getStage();
+                if (stage) stage.container().style.cursor = 'grab';
               }}
               onMouseLeave={(e) => {
-                 const stage = e.target.getStage();
-                 if (stage) stage.container().style.cursor = 'default';
+                const stage = e.target.getStage();
+                if (stage) stage.container().style.cursor = 'default';
               }}
             />
           ))}

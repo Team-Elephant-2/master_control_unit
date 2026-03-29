@@ -1,16 +1,26 @@
 import { Room, Pipe } from '@/store/useAppStore';
+import Konva from 'konva';
+
+// Calculate the relative mouse position in stage coordinates (taking scale/zoom into account)
+export function getRelativePointerPosition(stage: Konva.Stage): { x: number; y: number } | null {
+  const transform = stage.getAbsoluteTransform().copy();
+  transform.invert();
+  const pos = stage.getPointerPosition();
+  return pos ? transform.point(pos) : null;
+}
 
 // Find closest point on a set of Pipes
 export function getClosestPointOnPipes(
   px: number,
   py: number,
   pipes: Pipe[]
-): { x: number; y: number; dist: number } | null {
+): { x: number; y: number; dist: number; pipeId: string } | null {
   if (pipes.length === 0) return null;
 
   let minDist = Infinity;
   let bestX = px;
   let bestY = py;
+  let bestPipeId = '';
 
   for (const pipe of pipes) {
     const points = pipe.points;
@@ -36,12 +46,13 @@ export function getClosestPointOnPipes(
         minDist = dist;
         bestX = projX;
         bestY = projY;
+        bestPipeId = pipe.id;
       }
     }
   }
 
   if (minDist === Infinity) return null;
-  return { x: bestX, y: bestY, dist: minDist };
+  return { x: bestX, y: bestY, dist: minDist, pipeId: bestPipeId };
 }
 
 // Ray-casting algorithm for Point-in-Polygon
